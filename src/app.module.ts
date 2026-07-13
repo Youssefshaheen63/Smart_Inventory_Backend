@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
+import { SkuModule } from './sku/sku.module';
 
 @Module({
   imports: [
@@ -22,6 +23,8 @@ import { TypeOrmModule } from "@nestjs/typeorm";
         logging: config.get<string>("NODE_ENV") === "development",
       }),
     }),
+
+    SkuModule,
   ],
 })
 export class AppModule {}
