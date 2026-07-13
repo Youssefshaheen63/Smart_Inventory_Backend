@@ -6,21 +6,15 @@ import {
 } from 'typeorm';
 
 export abstract class AbstractEntity {
-  @PrimaryGeneratedColumn()
-  id!: number;
+  @PrimaryGeneratedColumn('uuid')
+  id!: string;
 
-  @CreateDateColumn({
-    type: 'timestamp',
-  })
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
-  @UpdateDateColumn({
-    type: 'timestamp',
-  })
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt!: Date;
 
-  @DeleteDateColumn({
-    nullable: true,
-  })
-  deletedAt!: Date ;
+  @DeleteDateColumn({ type: 'timestamptz', nullable: true })
+  deletedAt!: Date | null;
 }
