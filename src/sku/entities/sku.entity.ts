@@ -5,6 +5,9 @@ import {
 } from 'typeorm';
 import { AbstractEntity } from '../../shared/base.entity';
 
+/**
+ * Sku database entity representing unique product variants.
+ */
 @Entity('skus')
 export class Sku extends AbstractEntity {
   @Index({ unique: true })
@@ -23,7 +26,6 @@ export class Sku extends AbstractEntity {
 
   @Column({ length: 50, default: 'pcs' })
   unit!: string;
-
 
   @Column('numeric', {
     precision: 12,
@@ -45,21 +47,9 @@ export class Sku extends AbstractEntity {
   })
   price!: number;
 
-
   @Column('int', { default: 0 })
   reorderThreshold!: number;
 
-  //Hard stop — no sales allowed below this level , sale here may done by the manager acceptance 
   @Column('int', { default: 0 })
   safetyStock!: number;
-
-  //  Relations (add as other modules are built) 
-  // @ManyToOne(() => Vendor, (vendor) => vendor.skus, { nullable: true })
-  // preferredVendor?: Vendor;
-
-  // @OneToMany(() => StockMovement, (movement) => movement.sku)
-  // movements?: StockMovement[];
-
-  // @OneToMany(() => PurchaseOrderLine, (line) => line.sku)
-  // purchaseOrderLines?: PurchaseOrderLine[];
 }
