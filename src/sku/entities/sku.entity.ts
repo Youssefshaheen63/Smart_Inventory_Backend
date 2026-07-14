@@ -21,7 +21,7 @@ export class Sku extends AbstractEntity {
   description!: string | null;
 
   @Index()
-  @Column({ length: 100, nullable: true })
+  @Column({ type: 'varchar', length: 100, nullable: true })
   category!: string | null;
 
   @Column({ length: 50, default: 'pcs' })
