@@ -52,4 +52,14 @@ export class Sku extends AbstractEntity {
 
   @Column('int', { default: 0 })
   safetyStock!: number;
+
+  /**
+   * Denormalized cache of the current stock level.
+   *
+   * This field is updated atomically by StockMovementService.recordMovement()
+   * inside a transaction — do NOT modify it directly anywhere else.
+   * Use reconcileBalance() to verify it against the ledger sum.
+   */
+  @Column('int', { default: 0 })
+  currentQuantity!: number;
 }
