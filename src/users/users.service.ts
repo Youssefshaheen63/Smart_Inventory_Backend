@@ -3,117 +3,141 @@ import {
   Logger,
   ConflictException,
   NotFoundException,
-} from "@nestjs/common";
-import { UserRepository } from "./repositories/user.repository";
-import { CreateUserDto } from "./dto/create-user.dto";
-import { UserResponseDto } from "./dto/user-response.dto";
-import { User } from "./entities/user.entity";
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User } from './entities/user.entity';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { UserResponseDto } from './dto/user-response.dto';
+import { UserMapper } from './mappers/user.mapper';
 
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
 
-  constructor(private readonly userRepository: UserRepository) {}
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    private readonly userMapper: UserMapper,
+  ) {}
 
   /**
-   * Create a new user
+   * Create a new user with unique email and username checks.
    */
   async create(createUserDto: CreateUserDto): Promise<UserResponseDto> {
-    // Check if email already exists
-    if (await this.userRepository.emailExists(createUserDto.email)) {
-      throw new ConflictException("Email already exists");
-    }
-
-    // Check if username already exists
-    if (await this.userRepository.usernameExists(createUserDto.username)) {
-      throw new ConflictException("Username already exists");
-    }
-
-    const user = await this.userRepository.createUser({
-      ...createUserDto,
-      role: "user",
+    const emailTaken = await this.userRepository.existsBy({
+      email: createUserDto.email,
     });
-
-    this.logger.log(`User created: ${user.id}`);
-    return this.toResponseDto(user);
-  }
-
-  /**
-   * Find user by ID
-   */
-  async findById(id: string): Promise<UserResponseDto> {
-    const user = await this.userRepository.findById(id);
-    if (!user) {
-      throw new NotFoundException("User not found");
+    if (emailTaken) {
+      throw new ConflictException('Email already in use');
     }
-    return this.toResponseDto(user);
+
+    const usernameTaken = await this.userRepository.existsBy({
+      username: createUserDto.username,
+    });
+    if (usernameTaken) {
+      throw new ConflictException('Username already in use');
+    }
+
+    const user = this.userMapper.toEntity(createUserDto);
+    const saved = await this.userRepository.save(user);
+    this.logger.log(`User created: ${saved.id}`);
+    return this.userMapper.toResponse(saved);
   }
 
   /**
-   * Find user by email
-   */
-  async findByEmail(email: string): Promise<User | null> {
-    return this.userRepository.findByEmail(email);
-  }
-
-  /**
-   * Find active user by email
-   */
-  async findActiveByEmail(email: string): Promise<User | null> {
-    return this.userRepository.findActiveByEmail(email);
-  }
-
-  /**
-   * Find user by username
-   */
-  async findByUsername(username: string): Promise<User | null> {
-    return this.userRepository.findByUsername(username);
-  }
-
-  /**
-   * Find active user by username
-   */
-  async findActiveByUsername(username: string): Promise<User | null> {
-    return this.userRepository.findActiveByUsername(username);
-  }
-
-  /**
-   * Get all active users
+   * Return all active (non-deleted) users.
    */
   async findAll(): Promise<UserResponseDto[]> {
-    const users = await this.userRepository.findAllActive();
-    return users.map((user) => this.toResponseDto(user));
+    const users = await this.userRepository.find({
+      where: { isActive: true },
+      order: { createdAt: 'DESC' },
+    });
+    return this.userMapper.toResponseList(users);
   }
 
   /**
-   * Delete user
+   * Find a single user by UUID and return a safe response DTO.
+   */
+  async findById(id: string): Promise<UserResponseDto> {
+    const user = await this.userRepository.findOne({ where: { id } });
+    if (!user) {
+      throw new NotFoundException(`User with ID "${id}" not found`);
+    }
+    return this.userMapper.toResponse(user);
+  }
+
+  /**
+   * Returns the raw User entity WITH the password field selected.
+   * For AUTH USE ONLY — never expose this outside of the auth flow.
+   */
+  async findByEmailForAuth(email: string): Promise<User | null> {
+    return this.userRepository
+      .createQueryBuilder('user')
+      .addSelect('user.password')
+      .where('user.email = :email', { email })
+      .getOne();
+  }
+
+  /**
+   * Returns the raw User entity WITH the password field selected.
+   * For AUTH USE ONLY — never expose this outside of the auth flow.
+   */
+  async findByUsernameForAuth(username: string): Promise<User | null> {
+    return this.userRepository
+      .createQueryBuilder('user')
+      .addSelect('user.password')
+      .where('user.username = :username', { username })
+      .getOne();
+  }
+
+  /**
+   * Update a user's profile fields (email, username, firstName, lastName).
+   */
+  async update(id: string, updateUserDto: UpdateUserDto): Promise<UserResponseDto> {
+    const user = await this.userRepository.findOne({ where: { id } });
+    if (!user) {
+      throw new NotFoundException(`User with ID "${id}" not found`);
+    }
+
+    if (updateUserDto.email && updateUserDto.email !== user.email) {
+      const emailTaken = await this.userRepository.existsBy({ email: updateUserDto.email });
+      if (emailTaken) {
+        throw new ConflictException('Email already in use');
+      }
+      user.email = updateUserDto.email.toLowerCase().trim();
+    }
+
+    if (updateUserDto.username && updateUserDto.username !== user.username) {
+      const usernameTaken = await this.userRepository.existsBy({ username: updateUserDto.username });
+      if (usernameTaken) {
+        throw new ConflictException('Username already in use');
+      }
+      user.username = updateUserDto.username.trim();
+    }
+
+    if (updateUserDto.firstName !== undefined) {
+      user.firstName = updateUserDto.firstName?.trim() ?? null;
+    }
+    if (updateUserDto.lastName !== undefined) {
+      user.lastName = updateUserDto.lastName?.trim() ?? null;
+    }
+
+    const saved = await this.userRepository.save(user);
+    this.logger.log(`User updated: ${saved.id}`);
+    return this.userMapper.toResponse(saved);
+  }
+
+  /**
+   * Soft-delete a user by ID (sets deletedAt; record is preserved in DB).
    */
   async remove(id: string): Promise<void> {
-    const user = await this.userRepository.findById(id);
+    const user = await this.userRepository.findOne({ where: { id } });
     if (!user) {
-      throw new NotFoundException("User not found");
+      throw new NotFoundException(`User with ID "${id}" not found`);
     }
-
-    const deleted = await this.userRepository.deleteUser(id);
-    if (deleted) {
-      this.logger.log(`User deleted: ${id}`);
-    }
-  }
-
-  /**
-   * Convert User entity to response DTO (removes password)
-   */
-  private toResponseDto(user: User): UserResponseDto {
-    return new UserResponseDto({
-      id: user.id,
-      email: user.email,
-      username: user.username,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.role,
-      isActive: user.isActive,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-    });
+    await this.userRepository.softRemove(user);
+    this.logger.log(`User soft-deleted: ${id}`);
   }
 }
