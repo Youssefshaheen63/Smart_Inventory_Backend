@@ -1,6 +1,8 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { RolesGuard } from './auth/roles.guard';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 
 async function bootstrap() {
@@ -18,14 +20,16 @@ async function bootstrap() {
   SwaggerModule.setup('api', app, document);
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,        // strip properties not in the DTO
-      forbidNonWhitelisted: true, // throw if unknown properties sent
-      transform: true,        // auto-cast types + run @Transform decorators
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
       transformOptions: {
-        enableImplicitConversion: true, // convert "123" -> 123 for @IsNumber fields
+        enableImplicitConversion: true,
       },
     }),
   );
+
+  app.useGlobalGuards(new JwtAuthGuard(app.get('Reflector')), new RolesGuard(app.get('Reflector')));
 
   await app.listen(process.env.PORT ?? 3000);
 }
