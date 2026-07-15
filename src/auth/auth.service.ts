@@ -10,8 +10,8 @@ export class AuthService {
   ) {}
 
   async signIn(usernameOrEmail: string, password: string): Promise<any> {
-    let user = await this.usersService.findByEmail(usernameOrEmail);
-    user ??= await this.usersService.findByUsername(usernameOrEmail);
+    let user = await this.usersService.findByEmailForAuth(usernameOrEmail);
+    user ??= await this.usersService.findByUsernameForAuth(usernameOrEmail);
 
     if (!user || !(await user.comparePassword(password))) {
       throw new UnauthorizedException("Invalid email or password");

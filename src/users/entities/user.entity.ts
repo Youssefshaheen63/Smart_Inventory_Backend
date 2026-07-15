@@ -1,65 +1,56 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  CreateDateColumn,
-  UpdateDateColumn,
-  Index,
-  BeforeInsert,
-  BeforeUpdate,
-} from "typeorm";
-import * as bcrypt from "bcryptjs";
+import { Entity, Column, Index, BeforeInsert, BeforeUpdate } from 'typeorm';
+import * as bcrypt from 'bcryptjs';
+import { AbstractEntity } from '../../shared/base.entity';
 
-@Entity("users")
-@Index(["email"], { unique: true })
-@Index(["username"], { unique: true })
-export class User {
-  @PrimaryGeneratedColumn("uuid")
-  id: string;
+export enum UserRole {
+  ADMIN = 'admin',
+  USER = 'user',
+}
 
-  @Column({ type: "varchar", length: 255 })
-  email: string;
+@Entity('users')
+export class User extends AbstractEntity {
+  @Index({ unique: true })
+  @Column({ type: 'varchar', length: 255 })
+  email!: string;
 
-  @Column({ type: "varchar", length: 100 })
-  username: string;
-
-  @Column({ type: "varchar", length: 255 })
-  password: string;
-
-  @Column({ type: "varchar", length: 255, nullable: true })
-  firstName?: string;
-
-  @Column({ type: "varchar", length: 255, nullable: true })
-  lastName?: string;
-
-  @Column({ type: "varchar", length: 50, default: "user" })
-  role: string;
-
-  @Column({ type: "boolean", default: true })
-  isActive: boolean;
-
-  @CreateDateColumn({ type: "timestamp" })
-  createdAt: Date;
-
-  @UpdateDateColumn({ type: "timestamp" })
-  updatedAt: Date;
+  @Index({ unique: true })
+  @Column({ type: 'varchar', length: 100 })
+  username!: string;
 
   /**
-   * Hash password before saving
+   * Password is excluded from SELECT by default.
+   * Use createQueryBuilder().addSelect('user.password') when it is needed (auth flows only).
+   */
+  @Column({ type: 'varchar', length: 255, select: false })
+  password!: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  firstName!: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  lastName!: string | null;
+
+  @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
+  role!: UserRole;
+
+  @Column({ type: 'boolean', default: true })
+  isActive!: boolean;
+
+  /**
+   * Hashes the password before any INSERT or UPDATE.
+   * Because `password` has `select: false`, partial updates that do not
+   * touch the password field will not have the property set, so no
+   * re-hashing will occur.
    */
   @BeforeInsert()
   @BeforeUpdate()
-  async hashPassword() {
-    if (this.password && !this.password.startsWith("$2")) {
-      const saltRounds = 10;
-      this.password = await bcrypt.hash(this.password, saltRounds);
+  async hashPassword(): Promise<void> {
+    if (this.password) {
+      this.password = await bcrypt.hash(this.password, 10);
     }
   }
 
-  /**
-   * Compare password with hashed password
-   */
-  async comparePassword(password: string): Promise<boolean> {
-    return bcrypt.compare(password, this.password);
+  async comparePassword(plain: string): Promise<boolean> {
+    return bcrypt.compare(plain, this.password);
   }
 }
