@@ -7,9 +7,15 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: stocksavvy_pass
     ports:
-      - "5432:5432"
+      - "5424:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+  
+  adminer:
+    image: adminer:latest
+    container_name: order-service-adminer
+    ports:
+    - "8888:8080"
 
   redis:
     image: redis:7
