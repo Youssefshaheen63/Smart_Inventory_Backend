@@ -1,5 +1,6 @@
-import { Column, Entity } from 'typeorm';
+import { Column, Entity, OneToMany } from 'typeorm';
 import { AbstractEntity } from '../../shared/base.entity';
+import { PurchaseOrderLineItem } from './purchase-order-line-item.entity';
 
 @Entity('purchase_orders')
 export class PurchaseOrder extends AbstractEntity {
@@ -18,4 +19,7 @@ export class PurchaseOrder extends AbstractEntity {
 
   @Column('uuid', { nullable: true })
   negotiationRunId!: string | null;
+
+  @OneToMany(() => PurchaseOrderLineItem, (lineItem) => lineItem.purchaseOrder, { cascade: true })
+  lineItems!: PurchaseOrderLineItem[];
 }
