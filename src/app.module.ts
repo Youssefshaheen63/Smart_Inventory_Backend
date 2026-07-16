@@ -4,6 +4,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { SkuModule } from './sku/sku.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
+import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module';
 import { InventoryModule } from './inventory/inventory.module';
 
 @Module({
@@ -30,6 +31,7 @@ import { InventoryModule } from './inventory/inventory.module';
     SkuModule,
     AuthModule,
     UsersModule,
+    PurchaseOrdersModule,
     InventoryModule,
   ],
 })
