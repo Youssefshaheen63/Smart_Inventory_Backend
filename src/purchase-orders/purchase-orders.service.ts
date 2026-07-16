@@ -29,14 +29,14 @@ export class PurchaseOrdersService {
     const saved = await this.poRepository.save(po);
     const loaded = await this.poRepository.findOne({
       where: { id: saved.id },
-      relations: ['lineItems'],
+      relations: { lineItems: true },
     });
     return this.mapper.toResponse(loaded!);
   }
 
   async findAll(): Promise<PurchaseOrderResponseDto[]> {
     const pos = await this.poRepository.find({
-      relations: ['lineItems'],
+      relations: { lineItems: true },
       order: { createdAt: 'DESC' },
     });
     return this.mapper.toResponseList(pos);
@@ -45,7 +45,7 @@ export class PurchaseOrdersService {
   async findOne(id: string): Promise<PurchaseOrderResponseDto> {
     const po = await this.poRepository.findOne({
       where: { id },
-      relations: ['lineItems'],
+      relations: { lineItems: true },
     });
     if (!po) {
       throw new NotFoundException(`Purchase order with ID "${id}" not found`);
@@ -56,7 +56,7 @@ export class PurchaseOrdersService {
   async transition(id: string, targetStatus: string): Promise<PurchaseOrderResponseDto> {
     const po = await this.poRepository.findOne({
       where: { id },
-      relations: ['lineItems'],
+      relations: { lineItems: true },
     });
     if (!po) {
       throw new NotFoundException(`Purchase order with ID "${id}" not found`);
@@ -73,7 +73,7 @@ export class PurchaseOrdersService {
     const saved = await this.poRepository.save(po);
     const loaded = await this.poRepository.findOne({
       where: { id: saved.id },
-      relations: ['lineItems'],
+      relations: { lineItems: true },
     });
     return this.mapper.toResponse(loaded!);
   }
