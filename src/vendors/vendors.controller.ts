@@ -10,6 +10,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
@@ -24,6 +25,8 @@ import { VendorsService } from './vendors.service';
 import { CreateVendorDto } from './dto/create-vendor.dto';
 import { UpdateVendorDto } from './dto/update-vendor.dto';
 import { VendorResponseDto } from './dto/vendor-response.dto';
+import { VendorQueryDto } from './dto/vendor-query.dto';
+import { successResponse, paginatedResponse } from '../utils/response.util';
 
 @ApiTags('vendors')
 @Controller('vendors')
@@ -34,23 +37,26 @@ export class VendorsController {
   @ApiOperation({ summary: 'Create a vendor' })
   @ApiCreatedResponse({ type: VendorResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request body' })
-  create(@Body() dto: CreateVendorDto): Promise<VendorResponseDto> {
-    return this.vendorsService.create(dto);
+  async create(@Body() dto: CreateVendorDto) {
+    const data = await this.vendorsService.create(dto);
+    return successResponse(data);
   }
 
   @Get()
   @ApiOperation({ summary: 'List vendors' })
   @ApiOkResponse({ type: VendorResponseDto, isArray: true })
-  findAll(): Promise<VendorResponseDto[]> {
-    return this.vendorsService.findAll();
+  async findAll(@Query() query: VendorQueryDto) {
+    const { data, total } = await this.vendorsService.findAll(query);
+    return paginatedResponse(data, query.page!, query.limit!, total);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a vendor by ID' })
   @ApiParam({ name: 'id', description: 'Vendor UUID' })
   @ApiOkResponse({ type: VendorResponseDto })
-  findOne(@Param('id', ParseUUIDPipe) id: string): Promise<VendorResponseDto> {
-    return this.vendorsService.findOne(id);
+  async findOne(@Param('id', ParseUUIDPipe) id: string) {
+    const data = await this.vendorsService.findOne(id);
+    return successResponse(data);
   }
 
   @Patch(':id')
@@ -58,19 +64,21 @@ export class VendorsController {
   @ApiParam({ name: 'id', description: 'Vendor UUID' })
   @ApiOkResponse({ type: VendorResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request body' })
-  update(
+  async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateVendorDto,
-  ): Promise<VendorResponseDto> {
-    return this.vendorsService.update(id, dto);
+  ) {
+    const data = await this.vendorsService.update(id, dto);
+    return successResponse(data);
   }
 
   @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete a vendor' })
   @ApiParam({ name: 'id', description: 'Vendor UUID' })
-  @ApiNoContentResponse({ description: 'Vendor deleted successfully' })
-  remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
-    return this.vendorsService.remove(id);
+  @ApiOkResponse({ description: 'Vendor deleted successfully' })
+  async remove(@Param('id', ParseUUIDPipe) id: string) {
+    await this.vendorsService.remove(id);
+    return successResponse(null);
   }
 }

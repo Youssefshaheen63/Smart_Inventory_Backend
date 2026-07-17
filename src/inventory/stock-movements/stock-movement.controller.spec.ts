@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { StockMovementController } from './stock-movement.controller';
 import { StockMovementService } from './stock-movement.service';
 import { MovementReason } from './enums/movement-reason.enum';
+import { StockMovementQueryDto } from './dto/stock-movement-query.dto';
 
 describe('StockMovementController', () => {
   let controller: StockMovementController;
@@ -35,8 +36,8 @@ describe('StockMovementController', () => {
   });
 
   describe('getHistoryForSku', () => {
-    it('should delegate to stockMovementService.getHistoryForSku', async () => {
-      const mockResult = [
+    it('should return paginated response wrapped from service', async () => {
+      const mockData = [
         {
           id: 'mov-1',
           skuId: 'sku-1',
@@ -45,23 +46,30 @@ describe('StockMovementController', () => {
           balanceAfter: 15,
           createdAt: new Date(),
         },
-      ] as any;
+      ];
 
-      mockStockMovementService.getHistoryForSku.mockResolvedValue(mockResult);
+      mockStockMovementService.getHistoryForSku.mockResolvedValue({
+        data: mockData,
+        total: 10,
+      });
 
-      const queryDto = { reason: MovementReason.MANUAL_ADJUSTMENT, limit: 10 };
+      const queryDto: StockMovementQueryDto = { reason: MovementReason.MANUAL_ADJUSTMENT, page: 1, limit: 10 };
       const result = await controller.getHistoryForSku('sku-uuid', queryDto);
 
       expect(mockStockMovementService.getHistoryForSku).toHaveBeenCalledWith(
         'sku-uuid',
         queryDto,
       );
-      expect(result).toBe(mockResult);
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual(mockData);
+      expect(result.meta.total).toBe(10);
+      expect(result.meta.page).toBe(1);
+      expect(result.meta.limit).toBe(10);
     });
   });
 
   describe('reconcileBalance', () => {
-    it('should delegate to stockMovementService.reconcileBalance', async () => {
+    it('should return success response wrapped from service', async () => {
       const mockResult = {
         skuId: 'sku-uuid',
         cached: 10,
@@ -74,16 +82,16 @@ describe('StockMovementController', () => {
       const result = await controller.reconcileBalance('sku-uuid');
 
       expect(mockStockMovementService.reconcileBalance).toHaveBeenCalledWith('sku-uuid');
-      expect(result).toBe(mockResult);
+      expect(result).toEqual({ success: true, data: mockResult, meta: null });
     });
   });
 
   describe('getConsumptionSeries', () => {
-    it('should delegate to stockMovementService.getConsumptionSeries with default sinceDays', async () => {
+    it('should return success response wrapped from service with default sinceDays', async () => {
       const mockResult = [
         { day: '2026-07-15', netChange: -5 },
         { day: '2026-07-16', netChange: 10 },
-      ] as any;
+      ];
 
       mockStockMovementService.getConsumptionSeries.mockResolvedValue(mockResult);
 
@@ -93,7 +101,7 @@ describe('StockMovementController', () => {
         'sku-uuid',
         30,
       );
-      expect(result).toBe(mockResult);
+      expect(result).toEqual({ success: true, data: mockResult, meta: null });
     });
   });
 });

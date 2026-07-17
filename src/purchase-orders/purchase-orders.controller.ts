@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Param,
+  Query,
   ParseUUIDPipe,
   HttpCode,
   HttpStatus,
@@ -12,32 +13,38 @@ import { PurchaseOrdersService } from './purchase-orders.service';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { TransitionDto } from './dto/transition.dto';
 import { PurchaseOrderResponseDto } from './dto/purchase-order-response.dto';
+import { PaginationQueryDto } from '../utils/query.dto';
+import { successResponse, paginatedResponse } from '../utils/response.util';
 
 @Controller('purchase-orders')
 export class PurchaseOrdersController {
   constructor(private readonly service: PurchaseOrdersService) {}
 
   @Post()
-  create(@Body() dto: CreatePurchaseOrderDto): Promise<PurchaseOrderResponseDto> {
-    return this.service.create(dto);
+  async create(@Body() dto: CreatePurchaseOrderDto) {
+    const data = await this.service.create(dto);
+    return successResponse(data);
   }
 
   @Get()
-  findAll(): Promise<PurchaseOrderResponseDto[]> {
-    return this.service.findAll();
+  async findAll(@Query() query: PaginationQueryDto) {
+    const { data, total } = await this.service.findAll(query);
+    return paginatedResponse(data, query.page!, query.limit!, total);
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseUUIDPipe) id: string): Promise<PurchaseOrderResponseDto> {
-    return this.service.findOne(id);
+  async findOne(@Param('id', ParseUUIDPipe) id: string) {
+    const data = await this.service.findOne(id);
+    return successResponse(data);
   }
 
   @Post(':id/transition')
   @HttpCode(HttpStatus.OK)
-  transition(
+  async transition(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: TransitionDto,
-  ): Promise<PurchaseOrderResponseDto> {
-    return this.service.transition(id, dto.status);
+  ) {
+    const data = await this.service.transition(id, dto.status);
+    return successResponse(data);
   }
 }

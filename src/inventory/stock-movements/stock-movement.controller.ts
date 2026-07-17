@@ -12,8 +12,8 @@ import {
   ReconciliationResult,
   DailyConsumptionRow,
 } from './stock-movement.service';
-import { MovementQueryDto } from './dto/movement-query.dto';
-import { StockMovementResponseDto } from './dto/stock-movement-response.dto';
+import { StockMovementQueryDto } from './dto/stock-movement-query.dto';
+import { successResponse, paginatedResponse } from '../../utils/response.util';
 
 @Controller('inventory/stock-movements')
 export class StockMovementController {
@@ -26,14 +26,15 @@ export class StockMovementController {
    * returned newest-first.
    *
    * Query params: `from`, `to` (ISO-8601 dates), `reason` (MovementReason),
-   * `limit` (default 50, max 500).
+   * `page`, `limit`.
    */
   @Get('sku/:skuId')
-  getHistoryForSku(
+  async getHistoryForSku(
     @Param('skuId', ParseUUIDPipe) skuId: string,
-    @Query() query: MovementQueryDto,
-  ): Promise<StockMovementResponseDto[]> {
-    return this.stockMovementService.getHistoryForSku(skuId, query);
+    @Query() query: StockMovementQueryDto,
+  ) {
+    const { data, total } = await this.stockMovementService.getHistoryForSku(skuId, query);
+    return paginatedResponse(data, query.page!, query.limit!, total);
   }
 
   /**
@@ -45,10 +46,11 @@ export class StockMovementController {
    * Not on the hot path — intended for admin / cron use.
    */
   @Get('sku/:skuId/reconcile')
-  reconcileBalance(
+  async reconcileBalance(
     @Param('skuId', ParseUUIDPipe) skuId: string,
-  ): Promise<ReconciliationResult> {
-    return this.stockMovementService.reconcileBalance(skuId);
+  ) {
+    const data = await this.stockMovementService.reconcileBalance(skuId);
+    return successResponse(data);
   }
 
   /**
@@ -59,10 +61,11 @@ export class StockMovementController {
    * the demand-forecasting feature.
    */
   @Get('sku/:skuId/consumption')
-  getConsumptionSeries(
+  async getConsumptionSeries(
     @Param('skuId', ParseUUIDPipe) skuId: string,
     @Query('sinceDays', new DefaultValuePipe(30), ParseIntPipe) sinceDays: number,
-  ): Promise<DailyConsumptionRow[]> {
-    return this.stockMovementService.getConsumptionSeries(skuId, sinceDays);
+  ) {
+    const data = await this.stockMovementService.getConsumptionSeries(skuId, sinceDays);
+    return successResponse(data);
   }
 }

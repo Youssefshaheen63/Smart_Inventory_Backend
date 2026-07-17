@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   HttpCode,
   HttpStatus,
   ParseUUIDPipe,
@@ -15,6 +16,8 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { Roles } from '../auth/roles.decorator';
+import { PaginationQueryDto } from '../utils/query.dto';
+import { successResponse, paginatedResponse } from '../utils/response.util';
 
 @Controller('users')
 export class UsersController {
@@ -22,34 +25,39 @@ export class UsersController {
 
   @Roles('admin')
   @Get()
-  findAll(): Promise<UserResponseDto[]> {
-    return this.usersService.findAll();
+  async findAll(@Query() query: PaginationQueryDto) {
+    const { data, total } = await this.usersService.findAll(query);
+    return paginatedResponse(data, query.page!, query.limit!, total);
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseUUIDPipe) id: string): Promise<UserResponseDto> {
-    return this.usersService.findById(id);
+  async findOne(@Param('id', ParseUUIDPipe) id: string) {
+    const data = await this.usersService.findById(id);
+    return successResponse(data);
   }
 
   @Roles('admin')
   @Post()
-  create(@Body() createUserDto: CreateUserDto): Promise<UserResponseDto> {
-    return this.usersService.create(createUserDto);
+  async create(@Body() createUserDto: CreateUserDto) {
+    const data = await this.usersService.create(createUserDto);
+    return successResponse(data);
   }
 
   @Roles('admin')
   @Patch(':id')
-  update(
+  async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateUserDto: UpdateUserDto,
-  ): Promise<UserResponseDto> {
-    return this.usersService.update(id, updateUserDto);
+  ) {
+    const data = await this.usersService.update(id, updateUserDto);
+    return successResponse(data);
   }
 
   @Roles('admin')
   @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
-    return this.usersService.remove(id);
+  @HttpCode(HttpStatus.OK)
+  async remove(@Param('id', ParseUUIDPipe) id: string) {
+    await this.usersService.remove(id);
+    return successResponse(null);
   }
 }

@@ -10,6 +10,9 @@ import { CreateVendorDto } from './dto/create-vendor.dto';
 import { UpdateVendorDto } from './dto/update-vendor.dto';
 import { VendorResponseDto } from './dto/vendor-response.dto';
 import { VendorMapper } from './mappers/vendor.mapper';
+import { VendorQueryDto } from './dto/vendor-query.dto';
+import { paginate } from '../utils/pagination.util';
+import { applySortAndSearch } from '../utils/query.util';
 
 @Injectable()
 export class VendorsService {
@@ -25,11 +28,11 @@ export class VendorsService {
     return this.vendorMapper.toResponse(saved);
   }
 
-  async findAll(): Promise<VendorResponseDto[]> {
-    const vendors = await this.vendorRepository.find({
-      order: { createdAt: 'DESC' },
-    });
-    return this.vendorMapper.toResponseList(vendors);
+  async findAll(query: VendorQueryDto): Promise<{ data: VendorResponseDto[]; total: number }> {
+    const qb = this.vendorRepository.createQueryBuilder('vendor');
+    applySortAndSearch(qb, 'vendor', query.sortBy, query.sortOrder, query.search, ['name', 'contactEmail']);
+    const result = await paginate(qb, query.page!, query.limit!);
+    return { data: this.vendorMapper.toResponseList(result.data), total: result.total };
   }
 
   async findOne(id: string): Promise<VendorResponseDto> {
