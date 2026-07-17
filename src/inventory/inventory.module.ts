@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { StockMovement } from './stock-movements/entities/stock-movement.entity';
 import { Sku } from '../sku/entities/sku.entity';
+import { SkuModule } from '../sku/sku.module';
 import { StockMovementModule } from './stock-movements/stock-movement.module';
 import { InventoryController } from './inventory.controller';
 import { InventoryService } from './inventory.service';
@@ -10,6 +11,7 @@ import { InventoryService } from './inventory.service';
   imports: [
     TypeOrmModule.forFeature([StockMovement, Sku]),
     StockMovementModule,
+    SkuModule,
   ],
   controllers: [InventoryController],
   providers: [InventoryService],
