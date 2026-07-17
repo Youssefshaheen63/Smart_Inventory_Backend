@@ -6,6 +6,8 @@ import { PurchaseOrderLineItem } from './entities/purchase-order-line-item.entit
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { PurchaseOrderResponseDto } from './dto/purchase-order-response.dto';
 import { PurchaseOrderMapper } from './mappers/purchase-order.mapper';
+import { PaginationQueryDto } from '../utils/query.dto';
+import { paginate } from '../utils/pagination.util';
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   draft: ['pending_approval', 'rejected'],
@@ -34,12 +36,13 @@ export class PurchaseOrdersService {
     return this.mapper.toResponse(loaded!);
   }
 
-  async findAll(): Promise<PurchaseOrderResponseDto[]> {
-    const pos = await this.poRepository.find({
-      relations: { lineItems: true },
-      order: { createdAt: 'DESC' },
-    });
-    return this.mapper.toResponseList(pos);
+  async findAll(query: PaginationQueryDto): Promise<{ data: PurchaseOrderResponseDto[]; total: number }> {
+    const qb = this.poRepository
+      .createQueryBuilder('po')
+      .leftJoinAndSelect('po.lineItems', 'lineItems')
+      .orderBy('po.createdAt', 'DESC');
+    const result = await paginate(qb, query.page!, query.limit!);
+    return { data: this.mapper.toResponseList(result.data), total: result.total };
   }
 
   async findOne(id: string): Promise<PurchaseOrderResponseDto> {

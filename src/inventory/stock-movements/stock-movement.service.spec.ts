@@ -167,29 +167,34 @@ describe('StockMovementService', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('should return list of mapped movements filterable by query parameters', async () => {
+    it('should return paginated list of mapped movements filterable by query parameters', async () => {
       mockSkuRepo.existsBy.mockResolvedValue(true);
 
       const mockQueryBuilder = {
         where: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([
-          {
-            id: 'm1',
-            skuId: 'sku-uuid',
-            reason: MovementReason.SALE,
-            quantityChange: -2,
-            balanceAfter: 8,
-            createdAt: new Date(),
-          },
+        getManyAndCount: jest.fn().mockResolvedValue([
+          [
+            {
+              id: 'm1',
+              skuId: 'sku-uuid',
+              reason: MovementReason.SALE,
+              quantityChange: -2,
+              balanceAfter: 8,
+              createdAt: new Date(),
+            },
+          ],
+          1,
         ]),
       };
       mockMovRepo.createQueryBuilder.mockReturnValue(mockQueryBuilder);
 
       const result = await service.getHistoryForSku('sku-uuid', {
         reason: MovementReason.SALE,
+        page: 1,
         limit: 10,
       });
 
@@ -198,13 +203,13 @@ describe('StockMovementService', () => {
         'sm.skuId = :skuId',
         { skuId: 'sku-uuid' },
       );
-      expect(mockQueryBuilder.take).toHaveBeenCalledWith(10);
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
         'sm.reason = :reason',
         { reason: MovementReason.SALE },
       );
-      expect(result.length).toBe(1);
-      expect(result[0].id).toBe('m1');
+      expect(result.data.length).toBe(1);
+      expect(result.data[0].id).toBe('m1');
+      expect(result.total).toBe(1);
     });
   });
 

@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { InventoryService } from './inventory.service';
 import { RecordMovementDto } from './dto/record-movement.dto';
-import { StockMovement } from './stock-movements/entities/stock-movement.entity';
+import { successResponse } from '../utils/response.util';
 
 @Controller('inventory')
 export class InventoryController {
@@ -17,10 +17,11 @@ export class InventoryController {
 
   @Post('skus/:id/movements')
   @HttpCode(HttpStatus.CREATED)
-  recordMovement(
+  async recordMovement(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: RecordMovementDto,
-  ): Promise<StockMovement> {
-    return this.inventoryService.recordMovement(id, dto);
+  ) {
+    const data = await this.inventoryService.recordMovement(id, dto);
+    return successResponse(data);
   }
 }

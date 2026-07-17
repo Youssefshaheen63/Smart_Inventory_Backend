@@ -11,6 +11,9 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { UserMapper } from './mappers/user.mapper';
+import { PaginationQueryDto } from '../utils/query.dto';
+import { paginate } from '../utils/pagination.util';
+import { applySortAndSearch } from '../utils/query.util';
 
 @Injectable()
 export class UsersService {
@@ -49,12 +52,13 @@ export class UsersService {
   /**
    * Return all active (non-deleted) users.
    */
-  async findAll(): Promise<UserResponseDto[]> {
-    const users = await this.userRepository.find({
-      where: { isActive: true },
-      order: { createdAt: 'DESC' },
-    });
-    return this.userMapper.toResponseList(users);
+  async findAll(query: PaginationQueryDto): Promise<{ data: UserResponseDto[]; total: number }> {
+    const qb = this.userRepository
+      .createQueryBuilder('user')
+      .where('user.isActive = :isActive', { isActive: true });
+    applySortAndSearch(qb, 'user', query.sortBy, query.sortOrder, query.search, ['username', 'email', 'firstName', 'lastName']);
+    const result = await paginate(qb, query.page!, query.limit!);
+    return { data: this.userMapper.toResponseList(result.data), total: result.total };
   }
 
   /**

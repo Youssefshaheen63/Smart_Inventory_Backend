@@ -8,9 +8,10 @@ import { DataSource, Repository } from 'typeorm';
 import { StockMovement } from './entities/stock-movement.entity';
 import { Sku } from '../../sku/entities/sku.entity';
 import { MovementReason } from './enums/movement-reason.enum';
-import { MovementQueryDto } from './dto/movement-query.dto';
+import { StockMovementQueryDto } from './dto/stock-movement-query.dto';
 import { StockMovementResponseDto } from './dto/stock-movement-response.dto';
 import { StockMovementMapper } from './mappers/stock-movement.mapper';
+import { paginate } from '../../utils/pagination.util';
 
 
 export interface RecordMovementParams {
@@ -144,21 +145,17 @@ export class StockMovementService {
    */
   async getHistoryForSku(
     skuId: string,
-    query: MovementQueryDto,
-  ): Promise<StockMovementResponseDto[]> {
-    // Verify the SKU exists so callers get a clear 404 on bad IDs.
+    query: StockMovementQueryDto,
+  ): Promise<{ data: StockMovementResponseDto[]; total: number }> {
     const skuExists = await this.skuRepo.existsBy({ id: skuId });
     if (!skuExists) {
       throw new NotFoundException(`SKU with ID "${skuId}" not found`);
     }
 
-    const limit = query.limit ?? 50;
-
     const qb = this.movementRepo
       .createQueryBuilder('sm')
       .where('sm.skuId = :skuId', { skuId })
-      .orderBy('sm.createdAt', 'DESC')
-      .take(limit);
+      .orderBy('sm.createdAt', 'DESC');
 
     if (query.from) {
       qb.andWhere('sm.createdAt >= :from', { from: new Date(query.from) });
@@ -170,8 +167,8 @@ export class StockMovementService {
       qb.andWhere('sm.reason = :reason', { reason: query.reason });
     }
 
-    const movements = await qb.getMany();
-    return this.mapper.toResponseList(movements);
+    const result = await paginate(qb, query.page!, query.limit!);
+    return { data: this.mapper.toResponseList(result.data), total: result.total };
   }
 
   //  Integrity reconciliation 
