@@ -2,16 +2,22 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ApprovalQueueService } from './approval-queue.service';
 import { ApprovalRequest } from './entities/approval-request.entity';
-import { ApprovalRequestMapper } from './mappers/approval-request.mapper';
+import { PurchaseOrder } from '../purchase-orders/entities/purchase-order.entity';
 
 describe('ApprovalQueueService', () => {
   let service: ApprovalQueueService;
-  let mockRepo: any;
+  let mockApprovalRepo: any;
+  let mockPoRepo: any;
 
   beforeEach(async () => {
     jest.clearAllMocks();
 
-    mockRepo = {
+    mockApprovalRepo = {
+      find: jest.fn(),
+      count: jest.fn(),
+    };
+
+    mockPoRepo = {
       find: jest.fn(),
       count: jest.fn(),
     };
@@ -19,8 +25,8 @@ describe('ApprovalQueueService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ApprovalQueueService,
-        ApprovalRequestMapper,
-        { provide: getRepositoryToken(ApprovalRequest), useValue: mockRepo },
+        { provide: getRepositoryToken(ApprovalRequest), useValue: mockApprovalRepo },
+        { provide: getRepositoryToken(PurchaseOrder), useValue: mockPoRepo },
       ],
     }).compile();
 
@@ -31,51 +37,45 @@ describe('ApprovalQueueService', () => {
     expect(service).toBeDefined();
   });
 
-  describe('findAll', () => {
-    it('should return all approval requests ordered by createdAt desc', async () => {
-      const mockRequests = [
-        { id: '1', status: 'pending', agentType: 'reorder', stepNumber: 1, payload: {}, agentRunId: 'run-1', reasoning: null, reviewedBy: null, reviewedAt: null, createdAt: new Date() },
-        { id: '2', status: 'approved', agentType: 'negotiation', stepNumber: 2, payload: {}, agentRunId: 'run-2', reasoning: 'ok', reviewedBy: 'user-1', reviewedAt: new Date(), createdAt: new Date() },
-      ];
-      mockRepo.find.mockResolvedValue(mockRequests);
+  describe('findPending', () => {
+    it('should return combined list sorted by createdAt desc', async () => {
+      const now = new Date();
+      const later = new Date(now.getTime() + 1000);
 
-      const result = await service.findAll();
+      mockApprovalRepo.find.mockResolvedValue([
+        { id: 'ar-1', status: 'pending', agentType: 'reorder', stepNumber: 2, createdAt: later },
+      ]);
+      mockPoRepo.find.mockResolvedValue([
+        { id: 'po-1', status: 'pending_approval', createdAt: now },
+      ]);
 
-      expect(mockRepo.find).toHaveBeenCalledWith({
-        order: { createdAt: 'DESC' },
-      });
+      const result = await service.findPending();
+
       expect(result).toHaveLength(2);
+      expect(result[0].type).toBe('agent_request');
+      expect(result[0].id).toBe('ar-1');
+      expect(result[1].type).toBe('purchase_order');
+      expect(result[1].id).toBe('po-1');
+    });
+
+    it('should return empty array when nothing is pending', async () => {
+      mockApprovalRepo.find.mockResolvedValue([]);
+      mockPoRepo.find.mockResolvedValue([]);
+
+      const result = await service.findPending();
+
+      expect(result).toHaveLength(0);
     });
   });
 
   describe('countPending', () => {
-    it('should return the number of pending approval requests', async () => {
-      mockRepo.count.mockResolvedValue(3);
+    it('should return sum of pending agent requests and POs', async () => {
+      mockApprovalRepo.count.mockResolvedValue(3);
+      mockPoRepo.count.mockResolvedValue(2);
 
       const result = await service.countPending();
 
-      expect(mockRepo.count).toHaveBeenCalledWith({
-        where: { status: 'pending' },
-      });
-      expect(result).toBe(3);
-    });
-  });
-
-  describe('findPending', () => {
-    it('should return only pending requests', async () => {
-      const mockPending = [
-        { id: '1', status: 'pending', agentType: 'reorder', stepNumber: 1, payload: {}, agentRunId: 'run-1', reasoning: null, reviewedBy: null, reviewedAt: null, createdAt: new Date() },
-      ];
-      mockRepo.find.mockResolvedValue(mockPending);
-
-      const result = await service.findPending();
-
-      expect(mockRepo.find).toHaveBeenCalledWith({
-        where: { status: 'pending' },
-        order: { createdAt: 'DESC' },
-      });
-      expect(result).toHaveLength(1);
-      expect(result[0].status).toBe('pending');
+      expect(result).toBe(5);
     });
   });
 });
