@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Param,
@@ -14,6 +15,12 @@ import { successResponse } from '../utils/response.util';
 @Controller('inventory')
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
+
+  @Get('skus/low-stock')
+  async findLowStock() {
+    const data = await this.inventoryService.findLowStock();
+    return successResponse(data);
+  }
 
   @Post('skus/:id/movements')
   @HttpCode(HttpStatus.CREATED)

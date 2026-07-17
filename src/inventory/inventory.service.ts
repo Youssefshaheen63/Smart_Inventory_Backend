@@ -9,6 +9,8 @@ import { randomUUID } from 'node:crypto';
 import { Sku } from '../sku/entities/sku.entity';
 import { StockMovement } from './stock-movements/entities/stock-movement.entity';
 import { RecordMovementDto } from './dto/record-movement.dto';
+import { SkuResponseDto } from '../sku/dto/sku-response.dto';
+import { SkuMapper } from '../sku/mappers/sku.mapper';
 
 @Injectable()
 export class InventoryService {
@@ -18,6 +20,8 @@ export class InventoryService {
 
     @InjectRepository(Sku)
     private readonly skuRepo: Repository<Sku>,
+
+    private readonly skuMapper: SkuMapper,
   ) {}
 
   async recordMovement(
@@ -50,5 +54,15 @@ export class InventoryService {
     await this.skuRepo.increment({ id: skuId }, 'currentQuantity', dto.quantityChange);
 
     return saved;
+  }
+
+  async findLowStock(): Promise<SkuResponseDto[]> {
+    const skus = await this.skuRepo
+      .createQueryBuilder('sku')
+      .where('sku."currentQuantity" <= sku."reorderThreshold"')
+      .orderBy('sku."currentQuantity"', 'ASC')
+      .getMany();
+
+    return this.skuMapper.toResponseList(skus);
   }
 }
