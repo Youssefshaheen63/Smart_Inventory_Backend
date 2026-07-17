@@ -16,6 +16,8 @@ export class SkuResponseDto {
 
   price!: number;
 
+  currentQuantity!: number;
+
   reorderThreshold!: number;
 
   safetyStock!: number;

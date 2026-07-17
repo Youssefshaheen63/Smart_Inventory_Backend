@@ -33,6 +33,7 @@ export class SkuMapper {
     dto.unit = entity.unit;
     dto.cost = entity.cost;
     dto.price = entity.price;
+    dto.currentQuantity = entity.currentQuantity;
     dto.reorderThreshold = entity.reorderThreshold;
     dto.safetyStock = entity.safetyStock;
     dto.createdAt = entity.createdAt;
