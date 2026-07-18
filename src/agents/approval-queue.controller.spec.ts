@@ -29,9 +29,10 @@ describe('ApprovalQueueController', () => {
   });
 
   describe('findAll', () => {
-    it('should return success response with pending approvals', async () => {
+    it('should return success response with combined pending items', async () => {
       const mockData = [
-        { id: '1', status: 'pending', agentType: 'reorder', stepNumber: 1, payload: {}, agentRunId: 'run-1', reasoning: null, reviewedBy: null, reviewedAt: null, createdAt: new Date() },
+        { id: 'ar-1', type: 'agent_request', status: 'pending', description: 'reorder agent step 2', createdAt: new Date() },
+        { id: 'po-1', type: 'purchase_order', status: 'pending_approval', description: 'Purchase Order', createdAt: new Date() },
       ];
       mockService.findPending.mockResolvedValue(mockData);
 
