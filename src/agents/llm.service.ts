@@ -81,5 +81,30 @@ export class LLMService {
     throw new Error(`Exceeded maximum tool rounds (${maxToolRounds}) without a final response.`);
   }
 
-  
+  async getStructuredDecision<T>(
+    systemPrompt: string,
+    context: string,
+    schema: string,
+  ): Promise<T> {
+    const fullSystemPrompt = `${systemPrompt}\n\nRespond ONLY with a valid JSON object matching this schema, no other text, no markdown code fences:\n${schema}`;
+
+    const response = await this.client.messages.create({
+      model: MODEL,
+      system: fullSystemPrompt,
+      messages: [{ role: 'user', content: context }],
+      max_tokens: MAX_TOKENS,
+    });
+
+    const textBlocks = response.content.filter(
+      (block): block is Anthropic.TextBlock => block.type === 'text',
+    );
+    const raw = textBlocks.map((b) => b.text).join('\n');
+
+    const cleaned = raw
+      .replace(/```(?:json)?\s*/gi, '')
+      .replace(/```\s*$/g, '')
+      .trim();
+
+    return JSON.parse(cleaned) as T;
+  }
 }
