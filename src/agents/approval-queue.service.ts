@@ -1,61 +1,99 @@
-
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ApprovalRequest } from './entities/approval-request.entity';
-import { PurchaseOrder } from '../purchase-orders/entities/purchase-order.entity';
-import { PendingApprovalItemDto } from './dto/pending-approval-item.dto';
+import { ApprovalRequestMapper } from './mappers/approval-request.mapper';
+import { CreateApprovalRequestDto } from './dto/create-approval-request.dto';
+import { ApprovalQueryDto } from './dto/approval-query.dto';
+import { paginate } from '../utils/pagination.util';
+import { AgentRunService } from './agent-run.service';
+import { ApprovalRequestResponseDto } from './dto/approval-request-response.dto';
+import { ApproveApprovalRequestDto, RejectApprovalRequestDto } from './dto/approval-action.dto';
 
 @Injectable()
 export class ApprovalQueueService {
   constructor(
     @InjectRepository(ApprovalRequest)
     private readonly approvalRepo: Repository<ApprovalRequest>,
-
-    @InjectRepository(PurchaseOrder)
-    private readonly poRepo: Repository<PurchaseOrder>,
+    private readonly mapper: ApprovalRequestMapper,
+    private readonly agentRunService: AgentRunService,
   ) {}
 
-  async findPending(): Promise<PendingApprovalItemDto[]> {
-    const [approvalRequests, pendingPOs] = await Promise.all([
-      this.approvalRepo.find({
-        where: { status: 'pending' },
-        order: { createdAt: 'DESC' },
-      }),
-      this.poRepo.find({
-        where: { status: 'pending_approval' },
-        order: { createdAt: 'DESC' },
-      }),
-    ]);
+  async create(data: CreateApprovalRequestDto): Promise<ApprovalRequestResponseDto> {
+    const approval = this.approvalRepo.create({
+      agentRunId: data.agentRunId,
+      agentType: data.agentType,
+      stepNumber: data.stepNumber,
+      payload: data.payload,
+      reasoning: data.reasoning,
+      status: 'pending',
+      reviewedBy: null,
+      reviewedAt: null,
+    });
 
-    const items: PendingApprovalItemDto[] = [
-      ...approvalRequests.map((r) => ({
-        id: r.id,
-        type: 'agent_request' as const,
-        status: r.status,
-        description: `${r.agentType} agent step ${r.stepNumber}`,
-        createdAt: r.createdAt,
-      })),
-      ...pendingPOs.map((po) => ({
-        id: po.id,
-        type: 'purchase_order' as const,
-        status: po.status,
-        description: `Purchase Order`,
-        createdAt: po.createdAt,
-      })),
-    ];
-
-    items.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-
-    return items;
+    const saved = await this.approvalRepo.save(approval);
+    return this.mapper.toResponse(saved);
   }
 
-  async countPending(): Promise<number> {
-    const [approvalCount, poCount] = await Promise.all([
-      this.approvalRepo.count({ where: { status: 'pending' } }),
-      this.poRepo.count({ where: { status: 'pending_approval' } }),
-    ]);
+  async findPending(
+    query: ApprovalQueryDto,
+  ): Promise<{ data: ApprovalRequestResponseDto[]; total: number }> {
+    const qb = this.approvalRepo
+      .createQueryBuilder('approval')
+      .where('approval.status = :status', { status: 'pending' })
+      .orderBy('approval.createdAt', 'DESC');
 
-    return approvalCount + poCount;
+    if (query.agentType) {
+      qb.andWhere('approval.agentType = :agentType', {
+        agentType: query.agentType,
+      });
+    }
+
+    const result = await paginate(qb, query.page!, query.limit!);
+    return {
+      data: this.mapper.toResponseList(result.data),
+      total: result.total,
+    };
+  }
+
+  async approve(
+    id: string,
+    reviewedBy: string,
+    editedPayload?: object,
+  ): Promise<ApprovalRequestResponseDto> {
+    const approval = await this.approvalRepo.findOne({ where: { id } });
+    if (!approval) {
+      throw new NotFoundException(`Approval request with ID "${id}" not found`);
+    }
+
+    approval.status = 'approved';
+    approval.reviewedBy = reviewedBy;
+    approval.reviewedAt = new Date();
+    if (editedPayload) {
+      approval.payload = {
+        ...(approval.payload as Record<string, unknown>),
+        ...(editedPayload as Record<string, unknown>),
+      };
+    }
+
+    const saved = await this.approvalRepo.save(approval);
+    return this.mapper.toResponse(saved);
+  }
+
+  async reject(
+    id: string,
+    reviewedBy: string,
+  ): Promise<ApprovalRequestResponseDto> {
+    const approval = await this.approvalRepo.findOne({ where: { id } });
+    if (!approval) {
+      throw new NotFoundException(`Approval request with ID "${id}" not found`);
+    }
+
+    approval.status = 'rejected';
+    approval.reviewedBy = reviewedBy;
+    approval.reviewedAt = new Date();
+    const saved = await this.approvalRepo.save(approval);
+    await this.agentRunService.updateStatus(approval.agentRunId, 'rejected');
+    return this.mapper.toResponse(saved);
   }
 }
