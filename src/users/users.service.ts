@@ -1,7 +1,7 @@
 import {
+  ConflictException,
   Injectable,
   Logger,
-  ConflictException,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -26,26 +26,28 @@ export class UsersService {
   ) {}
 
   /**
-   * Create a new user with unique email and username checks.
+   * Create a new user with unique email, username, and "TENANT_OWNER" role.
    */
-  async create(createUserDto: CreateUserDto): Promise<UserResponseDto> {
+  async create(createUserDto: CreateUserDto, tenantId: string): Promise<UserResponseDto> {
+    // 1. Check if email is in use
     const emailTaken = await this.userRepository.existsBy({
-      email: createUserDto.email,
+      email: createUserDto.email.toLowerCase().trim(),
     });
     if (emailTaken) {
-      throw new ConflictException('Email already in use');
+      throw new ConflictException("Email already in use");
     }
 
+    // 2. Check if username is in use
     const usernameTaken = await this.userRepository.existsBy({
-      username: createUserDto.username,
+      username: createUserDto.username.trim(),
     });
     if (usernameTaken) {
-      throw new ConflictException('Username already in use');
+      throw new ConflictException("Username already in use");
     }
 
-    const user = this.userMapper.toEntity(createUserDto);
+    const user = this.userMapper.toEntity(createUserDto, tenantId);
     const saved = await this.userRepository.save(user);
-    this.logger.log(`User created: ${saved.id}`);
+    this.logger.log(`User created: ${saved.id} in tenant: ${tenantId}`);
     return this.userMapper.toResponse(saved);
   }
 

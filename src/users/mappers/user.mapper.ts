@@ -5,14 +5,16 @@ import { UserResponseDto } from '../dto/user-response.dto';
 
 @Injectable()
 export class UserMapper {
-  toEntity(dto: CreateUserDto): User {
+  toEntity(dto: CreateUserDto, tenantId: string): User {
     const user = new User();
+    user.tenantId = tenantId;
     user.email = dto.email.toLowerCase().trim();
     user.username = dto.username.trim();
     user.password = dto.password; // raw — hashed by @BeforeInsert hook on entity
     user.firstName = dto.firstName?.trim() ?? null;
     user.lastName = dto.lastName?.trim() ?? null;
-    user.role = UserRole.USER;
+    user.role = dto.role ?? UserRole.INVENTORY_CLERK;
+    user.warehouseId = dto.warehouseId ?? null;
     user.isActive = true;
     return user;
   }
@@ -20,6 +22,8 @@ export class UserMapper {
   toResponse(entity: User): UserResponseDto {
     const dto = new UserResponseDto();
     dto.id = entity.id;
+    dto.tenantId = entity.tenantId;
+    dto.warehouseId = entity.warehouseId;
     dto.email = entity.email;
     dto.username = entity.username;
     dto.firstName = entity.firstName;

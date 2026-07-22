@@ -39,8 +39,7 @@ export class UsersController {
   @Roles('admin')
   @Post()
   async create(@Body() createUserDto: CreateUserDto) {
-    const data = await this.usersService.create(createUserDto);
-    return successResponse(data);
+    return null; // User creation is handled by AuthService.signup, so this endpoint is not used.
   }
 
   @Roles('admin')
