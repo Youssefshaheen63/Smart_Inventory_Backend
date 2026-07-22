@@ -5,9 +5,6 @@ import {
 } from 'typeorm';
 import { AbstractEntity } from '../../shared/base.entity';
 
-/**
- * Sku database entity representing unique product variants.
- */
 @Entity('skus')
 export class Sku extends AbstractEntity {
   @Index({ unique: true })
