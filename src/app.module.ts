@@ -8,6 +8,10 @@ import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { VendorsModule } from './vendors/vendors.module';
 import { AgentsModule } from './agents/agents.module';
+import { CategoriesModule } from './categories/categories.module';
+import { WarehousesModule } from './warehouses/warehouses.module';
+import { StockLevelsModule } from './inventory/stock-levels/stock-levels.module';
+import { KnowledgeChunksModule } from './knowledge-chunks/knowledge-chunks.module';
 
 @Module({
   imports: [
@@ -37,6 +41,10 @@ import { AgentsModule } from './agents/agents.module';
     InventoryModule,
     VendorsModule,
     AgentsModule,
+    CategoriesModule,
+    WarehousesModule,
+    StockLevelsModule,
+    KnowledgeChunksModule,
   ],
 })
 export class AppModule {}
