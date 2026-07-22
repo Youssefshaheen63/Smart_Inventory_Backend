@@ -38,23 +38,24 @@ export class StockMovementController {
   }
 
   /**
-   * GET /inventory/stock-movements/sku/:skuId/reconcile
+   * GET /inventory/stock-movements/sku/:skuId/reconcile?warehouseId=:warehouseId
    *
    * Integrity check: re-sums the ledger and compares it to the cached
-   * `sku.currentQuantity`.  Returns `{ cached, calculated, matches }`.
+   * `StockLevel.quantity`.  Returns `{ cached, calculated, matches }`.
    *
    * Not on the hot path — intended for admin / cron use.
    */
   @Get('sku/:skuId/reconcile')
   async reconcileBalance(
     @Param('skuId', ParseUUIDPipe) skuId: string,
+    @Query('warehouseId', ParseUUIDPipe) warehouseId: string,
   ) {
-    const data = await this.stockMovementService.reconcileBalance(skuId);
+    const data = await this.stockMovementService.reconcileBalance(skuId, warehouseId);
     return successResponse(data);
   }
 
   /**
-   * GET /inventory/stock-movements/sku/:skuId/consumption?sinceDays=30
+   * GET /inventory/stock-movements/sku/:skuId/consumption?warehouseId=:warehouseId&sinceDays=30
    *
    * Returns daily net quantity changes over the last `sinceDays` calendar
    * days (default 30), ordered oldest-first.  Intended as a data feed for
@@ -63,9 +64,10 @@ export class StockMovementController {
   @Get('sku/:skuId/consumption')
   async getConsumptionSeries(
     @Param('skuId', ParseUUIDPipe) skuId: string,
+    @Query('warehouseId', ParseUUIDPipe) warehouseId: string,
     @Query('sinceDays', new DefaultValuePipe(30), ParseIntPipe) sinceDays: number,
   ) {
-    const data = await this.stockMovementService.getConsumptionSeries(skuId, sinceDays);
+    const data = await this.stockMovementService.getConsumptionSeries(skuId, warehouseId, sinceDays);
     return successResponse(data);
   }
 }
