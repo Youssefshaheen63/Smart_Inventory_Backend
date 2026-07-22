@@ -1,6 +1,7 @@
 import {
   IsEmail,
   IsString,
+  IsUUID,
   MinLength,
   MaxLength,
   IsOptional,
@@ -8,6 +9,11 @@ import {
 } from "class-validator";
 
 export class CreateUserDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(255)
+  name?: string;
+
   @IsEmail()
   email: string;
 
@@ -26,12 +32,6 @@ export class CreateUserDto {
   password: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  firstName?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  lastName?: string;
+  @IsUUID()
+  warehouseId?: string;
 }

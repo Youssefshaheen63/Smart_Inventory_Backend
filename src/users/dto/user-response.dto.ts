@@ -2,12 +2,12 @@ import { UserRole } from '../entities/user.entity';
 
 export class UserResponseDto {
   id!: string;
+  name!: string | null;
   email!: string;
   username!: string;
-  firstName!: string | null;
-  lastName!: string | null;
   role!: UserRole;
   isActive!: boolean;
+  warehouseId!: string | null;
   createdAt!: Date;
   updatedAt!: Date;
 }
