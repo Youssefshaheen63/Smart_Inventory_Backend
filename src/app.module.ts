@@ -1,6 +1,6 @@
-import { Module } from "@nestjs/common";
-import { ConfigModule, ConfigService } from "@nestjs/config";
-import { TypeOrmModule } from "@nestjs/typeorm";
+import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { SkuModule } from './sku/sku.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
@@ -8,6 +8,9 @@ import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { VendorsModule } from './vendors/vendors.module';
 import { AgentsModule } from './agents/agents.module';
+import { TenantsModule } from './tenants/tenants.module';
+import { WarehousesModule } from './warehouses/warehouses.module';
+import { CategoriesModule } from './categories/categories.module';
 
 @Module({
   imports: [
@@ -33,6 +36,9 @@ import { AgentsModule } from './agents/agents.module';
     SkuModule,
     AuthModule,
     UsersModule,
+    TenantsModule,
+    WarehousesModule,
+    CategoriesModule,
     PurchaseOrdersModule,
     InventoryModule,
     VendorsModule,
