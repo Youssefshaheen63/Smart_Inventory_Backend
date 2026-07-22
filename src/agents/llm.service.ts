@@ -24,7 +24,7 @@ export class LLMService {
   async runWithTools(
     systemPrompt: string,
     userMessage: string,
-    tools: Anthropic.ToolParam[],
+    tools: Anthropic.Messages.Tool[],
     toolExecutor: ToolExecutorService,
     maxToolRounds: number = 5,
   ): Promise<string> {
