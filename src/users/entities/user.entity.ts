@@ -4,8 +4,11 @@ import { AbstractEntity } from '../../shared/base.entity';
 import { Warehouse } from '../../warehouses/entities/warehouse.entity';
 
 export enum UserRole {
-  ADMIN = 'admin',
-  USER = 'user',
+  SUPER_ADMIN = 'super_admin',
+  TENANT_OWNER = 'tenant_owner',
+  WAREHOUSE_MANAGER = 'warehouse_manager',
+  BRANCH_MANAGER = 'branch_manager',
+  INVENTORY_CLERK = 'inventory_clerk',
 }
 
 @Entity('users')
@@ -28,7 +31,7 @@ export class User extends AbstractEntity {
   @Column({ type: 'varchar', length: 255, select: false, name: 'password_hash' })
   passwordHash!: string;
 
-  @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
+  @Column({ type: 'enum', enum: UserRole, default: UserRole.TENANT_OWNER })
   role!: UserRole;
 
   @Column({ type: 'boolean', default: true })

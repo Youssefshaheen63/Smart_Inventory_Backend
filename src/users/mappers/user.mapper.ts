@@ -11,7 +11,7 @@ export class UserMapper {
     user.email = dto.email.toLowerCase().trim();
     user.username = dto.username.trim();
     user.passwordHash = dto.password; // raw — hashed by @BeforeInsert hook on entity
-    user.role = UserRole.USER;
+    user.role = UserRole.TENANT_OWNER; // default role for new users
     user.isActive = true;
     user.warehouseId = dto.warehouseId ?? null;
     return user;
