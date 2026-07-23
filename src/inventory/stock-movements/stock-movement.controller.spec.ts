@@ -41,6 +41,7 @@ describe('StockMovementController', () => {
         {
           id: 'mov-1',
           skuId: 'sku-1',
+          warehouseId: 'wh-1',
           reason: MovementReason.MANUAL_ADJUSTMENT,
           quantityChange: 5,
           balanceAfter: 15,
@@ -72,6 +73,7 @@ describe('StockMovementController', () => {
     it('should return success response wrapped from service', async () => {
       const mockResult = {
         skuId: 'sku-uuid',
+        warehouseId: 'wh-uuid',
         cached: 10,
         calculated: 10,
         matches: true,
@@ -79,9 +81,9 @@ describe('StockMovementController', () => {
 
       mockStockMovementService.reconcileBalance.mockResolvedValue(mockResult);
 
-      const result = await controller.reconcileBalance('sku-uuid');
+      const result = await controller.reconcileBalance('sku-uuid', 'wh-uuid' as any);
 
-      expect(mockStockMovementService.reconcileBalance).toHaveBeenCalledWith('sku-uuid');
+      expect(mockStockMovementService.reconcileBalance).toHaveBeenCalledWith('sku-uuid', 'wh-uuid');
       expect(result).toEqual({ success: true, data: mockResult, meta: null });
     });
   });
@@ -95,12 +97,9 @@ describe('StockMovementController', () => {
 
       mockStockMovementService.getConsumptionSeries.mockResolvedValue(mockResult);
 
-      const result = await controller.getConsumptionSeries('sku-uuid', 30);
+      const result = await controller.getConsumptionSeries('sku-uuid', 'wh-uuid' as any, 30 as any);
 
-      expect(mockStockMovementService.getConsumptionSeries).toHaveBeenCalledWith(
-        'sku-uuid',
-        30,
-      );
+      expect(mockStockMovementService.getConsumptionSeries).toHaveBeenCalledWith('sku-uuid', 'wh-uuid', 30);
       expect(result).toEqual({ success: true, data: mockResult, meta: null });
     });
   });

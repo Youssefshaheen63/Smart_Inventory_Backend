@@ -6,16 +6,16 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { StockMovement } from './entities/stock-movement.entity';
-import { Sku } from '../../sku/entities/sku.entity';
+import { StockLevel } from '../stock-levels/entities/stock-level.entity';
 import { MovementReason } from './enums/movement-reason.enum';
 import { StockMovementQueryDto } from './dto/stock-movement-query.dto';
 import { StockMovementResponseDto } from './dto/stock-movement-response.dto';
 import { StockMovementMapper } from './mappers/stock-movement.mapper';
 import { paginate } from '../../utils/pagination.util';
 
-
 export interface RecordMovementParams {
   skuId: string;
+  warehouseId: string;
   reason: MovementReason;
   quantityChange: number;
   /** Caller-supplied unique key — duplicate submissions are silently deduplicated. */
@@ -27,11 +27,12 @@ export interface RecordMovementParams {
   note?: string;
 }
 
-//  Reconciliation result type 
+//  Reconciliation result type
 
 export interface ReconciliationResult {
   skuId: string;
-  /** Value currently stored in sku.currentQuantity (the denormalized cache). */
+  warehouseId: string;
+  /** Value currently stored in the StockLevel (the denormalized cache). */
   cached: number;
   /** SUM(quantityChange) recomputed directly from the ledger. */
   calculated: number;
@@ -39,7 +40,7 @@ export interface ReconciliationResult {
   matches: boolean;
 }
 
-//  Daily consumption series row 
+//  Daily consumption series row
 
 export interface DailyConsumptionRow {
   /** Calendar date (YYYY-MM-DD) */
@@ -48,32 +49,30 @@ export interface DailyConsumptionRow {
   netChange: number;
 }
 
-
 @Injectable()
 export class StockMovementService {
   constructor(
     @InjectRepository(StockMovement)
     private readonly movementRepo: Repository<StockMovement>,
 
-    @InjectRepository(Sku)
-    private readonly skuRepo: Repository<Sku>,
+    @InjectRepository(StockLevel)
+    private readonly stockLevelRepo: Repository<StockLevel>,
 
     private readonly dataSource: DataSource,
 
     private readonly mapper: StockMovementMapper,
   ) {}
 
-
   /**
    * The ONE authoritative method for changing stock levels.
    *
-   * Must be called instead of updating `sku.currentQuantity` directly anywhere
+   * Must be called instead of updating `StockLevel.quantity` directly anywhere
    * in the system.  Guarantees:
    *
    * 1. Idempotency   — duplicate idempotencyKey → same response, no extra row.
-   * 2. Atomicity     — SKU balance update and ledger insert happen in one TX.
-   * 3. Consistency   — pessimistic lock on the SKU row prevents concurrent
-   *                    double-counting for the same SKU.
+   * 2. Atomicity     — StockLevel balance update and ledger insert happen in one TX.
+   * 3. Consistency   — pessimistic lock on the StockLevel row prevents concurrent
+   *                    double-counting for the same SKU in the same warehouse.
    * 4. Non-negative  — rejects any movement that would drop stock below zero.
    */
   async recordMovement(
@@ -81,41 +80,48 @@ export class StockMovementService {
   ): Promise<StockMovementResponseDto> {
     return this.dataSource.transaction(async (manager) => {
       const movRepo = manager.getRepository(StockMovement);
-      const skuRepo = manager.getRepository(Sku);
+      const slRepo = manager.getRepository(StockLevel);
 
-      //Step 1: Idempotency check 
+      // Step 1: Idempotency check
       const existing = await movRepo.findOne({
         where: { idempotencyKey: params.idempotencyKey },
       });
       if (existing) {
-        // A movement with this key already exists — return it as-is.
         return this.mapper.toResponse(existing);
       }
 
-      // ── Step 2: Lock the SKU row 
-      const sku = await skuRepo.findOne({
-        where: { id: params.skuId },
+      // Step 2: Lock the StockLevel row
+      let stockLevel = await slRepo.findOne({
+        where: { skuId: params.skuId, warehouseId: params.warehouseId },
         lock: { mode: 'pessimistic_write' },
       });
-      if (!sku) {
-        throw new NotFoundException(
-          `SKU with ID "${params.skuId}" not found`,
-        );
+
+      // Step 3: Auto-create StockLevel if none exists (first movement for this sku+warehouse)
+      if (!stockLevel) {
+        stockLevel = slRepo.create({
+          skuId: params.skuId,
+          warehouseId: params.warehouseId,
+          quantity: 0,
+          reorderThreshold: 0,
+          safetyStock: 0,
+        });
+        stockLevel = await slRepo.save(stockLevel);
       }
 
-      //  Step 3: Compute new balance 
-      const newBalance = sku.currentQuantity + params.quantityChange;
+      // Step 4: Compute new balance
+      const newBalance = stockLevel.quantity + params.quantityChange;
 
-      //  Step 4: Guard against negative stock 
+      // Step 5: Guard against negative stock
       if (newBalance < 0) {
         throw new BadRequestException(
-          `Movement would result in negative stock (current: ${sku.currentQuantity}, change: ${params.quantityChange}).`,
+          `Movement would result in negative stock (current: ${stockLevel.quantity}, change: ${params.quantityChange}).`,
         );
       }
 
-      //  Step 5: Insert the ledger row 
+      // Step 6: Insert the ledger row
       const movement = movRepo.create({
         skuId: params.skuId,
+        warehouseId: params.warehouseId,
         reason: params.reason,
         quantityChange: params.quantityChange,
         balanceAfter: newBalance,
@@ -128,16 +134,16 @@ export class StockMovementService {
       });
       const saved = await movRepo.save(movement);
 
-      //  Step 6: Update the denormalized cache on the SKU 
-      sku.currentQuantity = newBalance;
-      await skuRepo.save(sku);
+      // Step 7: Update the denormalized cache on the StockLevel
+      stockLevel.quantity = newBalance;
+      await slRepo.save(stockLevel);
 
-      //  Step 7: Return mapped response 
+      // Step 8: Return mapped response
       return this.mapper.toResponse(saved);
     });
   }
 
-  //  Per-SKU history (read path) 
+  //  Per-SKU history (read path)
 
   /**
    * Returns paginated movement history for a single SKU, newest-first.
@@ -147,11 +153,6 @@ export class StockMovementService {
     skuId: string,
     query: StockMovementQueryDto,
   ): Promise<{ data: StockMovementResponseDto[]; total: number }> {
-    const skuExists = await this.skuRepo.existsBy({ id: skuId });
-    if (!skuExists) {
-      throw new NotFoundException(`SKU with ID "${skuId}" not found`);
-    }
-
     const qb = this.movementRepo
       .createQueryBuilder('sm')
       .where('sm.skuId = :skuId', { skuId })
@@ -171,42 +172,48 @@ export class StockMovementService {
     return { data: this.mapper.toResponseList(result.data), total: result.total };
   }
 
-  //  Integrity reconciliation 
+  //  Integrity reconciliation
 
   /**
    * Integrity-check utility: recomputes the true stock balance by summing
    * every ledger row for the SKU and compares it against the denormalized
-   * cache in `sku.currentQuantity`.
+   * cache in `StockLevel.quantity`.
    *
    * NOT on the hot path — call manually / from an admin job.
    */
-  async reconcileBalance(skuId: string): Promise<ReconciliationResult> {
-    const sku = await this.skuRepo.findOne({ where: { id: skuId } });
-    if (!sku) {
-      throw new NotFoundException(`SKU with ID "${skuId}" not found`);
+  async reconcileBalance(skuId: string, warehouseId: string): Promise<ReconciliationResult> {
+    const stockLevel = await this.stockLevelRepo.findOne({
+      where: { skuId, warehouseId },
+    });
+    if (!stockLevel) {
+      throw new NotFoundException(
+        `Stock level not found for SKU "${skuId}" in warehouse "${warehouseId}"`,
+      );
     }
 
     const result = await this.movementRepo
       .createQueryBuilder('sm')
       .select('COALESCE(SUM(sm.quantityChange), 0)', 'total')
       .where('sm.skuId = :skuId', { skuId })
+      .andWhere('sm.warehouseId = :warehouseId', { warehouseId })
       .getRawOne<{ total: string }>();
 
     const calculated = parseInt(result?.total ?? '0', 10);
 
     return {
       skuId,
-      cached: sku.currentQuantity,
+      warehouseId,
+      cached: stockLevel.quantity,
       calculated,
-      matches: sku.currentQuantity === calculated,
+      matches: stockLevel.quantity === calculated,
     };
   }
 
-  //  Demand-forecasting data feed 
+  //  Demand-forecasting data feed
 
   /**
    * Returns daily net quantity changes over the last `sinceDays` calendar days
-   * for the given SKU.
+   * for the given SKU in a given warehouse.
    *
    * This raw aggregation is the data source for a future Demand Forecasting
    * feature.  No forecasting logic is implemented here — just the data method.
@@ -216,18 +223,15 @@ export class StockMovementService {
    */
   async getConsumptionSeries(
     skuId: string,
+    warehouseId: string,
     sinceDays: number,
   ): Promise<DailyConsumptionRow[]> {
-    const skuExists = await this.skuRepo.existsBy({ id: skuId });
-    if (!skuExists) {
-      throw new NotFoundException(`SKU with ID "${skuId}" not found`);
-    }
-
     const rows = await this.movementRepo
       .createQueryBuilder('sm')
       .select("TO_CHAR(sm.createdAt AT TIME ZONE 'UTC', 'YYYY-MM-DD')", 'day')
       .addSelect('SUM(sm.quantityChange)', 'netChange')
       .where('sm.skuId = :skuId', { skuId })
+      .andWhere('sm.warehouseId = :warehouseId', { warehouseId })
       .andWhere(
         "sm.createdAt >= NOW() - (:sinceDays * INTERVAL '1 day')",
         { sinceDays },

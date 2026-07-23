@@ -1,11 +1,20 @@
-import { Column, Entity, OneToMany } from 'typeorm';
+import { Column, Entity, Index, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { AbstractEntity } from '../../shared/base.entity';
+import { Warehouse } from '../../warehouses/entities/warehouse.entity';
 import { PurchaseOrderLineItem } from './purchase-order-line-item.entity';
 
 @Entity('purchase_orders')
 export class PurchaseOrder extends AbstractEntity {
   @Column('uuid')
   vendorId!: string;
+
+  @ManyToOne(() => Warehouse, { onDelete: 'RESTRICT', nullable: false })
+  @JoinColumn({ name: 'warehouse_id' })
+  warehouse!: Warehouse;
+
+  @Index('idx_purchase_orders_warehouse')
+  @Column({ name: 'warehouse_id', type: 'uuid' })
+  warehouseId!: string;
 
   @Column({
     type: 'enum',

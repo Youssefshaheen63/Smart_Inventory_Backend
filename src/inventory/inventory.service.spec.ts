@@ -3,32 +3,29 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { InventoryService } from './inventory.service';
 import { StockMovement } from './stock-movements/entities/stock-movement.entity';
-import { Sku } from '../sku/entities/sku.entity';
-import { SkuMapper } from '../sku/mappers/sku.mapper';
+import { StockLevel } from './stock-levels/entities/stock-level.entity';
 import { RecordMovementDto } from './dto/record-movement.dto';
 import { MovementReason } from './stock-movements/enums/movement-reason.enum';
 
 describe('InventoryService', () => {
   let service: InventoryService;
-  let mockSkuRepo: any;
+  let mockStockLevelRepo: any;
   let mockMovRepo: any;
-  let skuRow: { id: string; currentQuantity: number };
+  let stockLevelRow: { id: string; skuId: string; warehouseId: string; quantity: number; reorderThreshold: number; safetyStock: number };
 
   beforeEach(async () => {
     jest.clearAllMocks();
 
-    skuRow = { id: 'sku-uuid', currentQuantity: 0 };
+    stockLevelRow = { id: 'sl-uuid', skuId: 'sku-uuid', warehouseId: 'wh-uuid', quantity: 0, reorderThreshold: 5, safetyStock: 2 };
 
-    mockSkuRepo = {
-      findOne: jest.fn().mockImplementation(({ where: { id } }: { where: { id: string } }) =>
-        Promise.resolve(id === 'sku-uuid' ? { ...skuRow, reorderThreshold: 5, skuCode: 'TEST', name: 'Test SKU', unit: 'pcs', cost: 10, price: 15, safetyStock: 2 } : null),
+    mockStockLevelRepo = {
+      findOne: jest.fn().mockImplementation(({ where: { skuId, warehouseId } }) =>
+        Promise.resolve(skuId === 'sku-uuid' && warehouseId === 'wh-uuid' ? stockLevelRow : null),
       ),
-      increment: jest.fn().mockImplementation(
-        (_criteria: any, _column: string, value: number) => {
-          skuRow.currentQuantity += value;
-          return Promise.resolve({ affected: 1 });
-        },
-      ),
+      save: jest.fn().mockImplementation((entity) => {
+        Object.assign(stockLevelRow, entity);
+        return Promise.resolve(entity);
+      }),
       createQueryBuilder: jest.fn(),
     };
 
@@ -44,9 +41,8 @@ describe('InventoryService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         InventoryService,
-        SkuMapper,
         { provide: getRepositoryToken(StockMovement), useValue: mockMovRepo },
-        { provide: getRepositoryToken(Sku), useValue: mockSkuRepo },
+        { provide: getRepositoryToken(StockLevel), useValue: mockStockLevelRepo },
       ],
     }).compile();
 
@@ -58,18 +54,21 @@ describe('InventoryService', () => {
   });
 
   describe('recordMovement', () => {
-    it('should throw NotFoundException when SKU does not exist', async () => {
+    it('should throw NotFoundException when StockLevel does not exist', async () => {
       const dto = new RecordMovementDto();
+      dto.warehouseId = 'wh-uuid';
       dto.quantityChange = 10;
       dto.reason = MovementReason.PURCHASE_ORDER_RECEIPT;
 
-      await expect(service.recordMovement('nonexistent-id', dto)).rejects.toThrow(
+      await expect(service.recordMovement('nonexistent-sku', dto)).rejects.toThrow(
         NotFoundException,
       );
     });
 
     it('should throw BadRequestException when movement would cause negative stock', async () => {
+      stockLevelRow.quantity = 0;
       const dto = new RecordMovementDto();
+      dto.warehouseId = 'wh-uuid';
       dto.quantityChange = -5;
       dto.reason = MovementReason.SALE;
 
@@ -78,8 +77,10 @@ describe('InventoryService', () => {
       );
     });
 
-    it('should record a movement and atomically increment currentQuantity', async () => {
+    it('should record a movement and atomically update StockLevel quantity', async () => {
+      stockLevelRow.quantity = 0;
       const dto = new RecordMovementDto();
+      dto.warehouseId = 'wh-uuid';
       dto.quantityChange = 10;
       dto.reason = MovementReason.PURCHASE_ORDER_RECEIPT;
       dto.performedBy = 'user-uuid';
@@ -87,69 +88,45 @@ describe('InventoryService', () => {
 
       const result = await service.recordMovement('sku-uuid', dto);
 
-      expect(mockSkuRepo.increment).toHaveBeenCalledWith(
-        { id: 'sku-uuid' },
-        'currentQuantity',
-        10,
-      );
       expect(result.skuId).toBe('sku-uuid');
+      expect(result.warehouseId).toBe('wh-uuid');
       expect(result.quantityChange).toBe(10);
       expect(result.balanceAfter).toBe(10);
-    });
-
-    it('should keep currentQuantity equal to the sum of all movements', async () => {
-      const movements = [
-        { quantityChange: 50, reason: MovementReason.PURCHASE_ORDER_RECEIPT },
-        { quantityChange: -10, reason: MovementReason.SALE },
-        { quantityChange: -5, reason: MovementReason.SALE },
-        { quantityChange: 20, reason: MovementReason.CUSTOMER_RETURN },
-        { quantityChange: -2, reason: MovementReason.WRITE_OFF },
-      ];
-
-      for (const m of movements) {
-        const dto = new RecordMovementDto();
-        dto.quantityChange = m.quantityChange;
-        dto.reason = m.reason;
-        await service.recordMovement('sku-uuid', dto);
-      }
-
-      const expectedSum = movements.reduce((sum, m) => sum + m.quantityChange, 0);
-      expect(skuRow.currentQuantity).toBe(expectedSum);
-      expect(mockSkuRepo.increment).toHaveBeenCalledTimes(movements.length);
+      expect(stockLevelRow.quantity).toBe(10);
     });
   });
 
   describe('findLowStock', () => {
-    it('should return SKUs where currentQuantity <= reorderThreshold', async () => {
-      const mockSkus = [
-        { id: 'sku-1', currentQuantity: 3, reorderThreshold: 5, skuCode: 'LOW-1', name: 'Low SKU 1', unit: 'pcs', cost: 10, price: 15, safetyStock: 2, description: null, category: null, createdAt: new Date(), updatedAt: new Date(), deletedAt: null },
-        { id: 'sku-2', currentQuantity: 5, reorderThreshold: 5, skuCode: 'AT-THRESHOLD', name: 'At threshold', unit: 'pcs', cost: 10, price: 15, safetyStock: 2, description: null, category: null, createdAt: new Date(), updatedAt: new Date(), deletedAt: null },
+    it('should return StockLevels where quantity <= reorderThreshold', async () => {
+      const mockLevels = [
+        { id: 'sl-1', skuId: 'sku-1', warehouseId: 'wh-1', quantity: 3, reorderThreshold: 5, safetyStock: 2 },
+        { id: 'sl-2', skuId: 'sku-2', warehouseId: 'wh-1', quantity: 5, reorderThreshold: 5, safetyStock: 2 },
       ];
 
       const mockQueryBuilder = {
         where: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue(mockSkus),
+        getMany: jest.fn().mockResolvedValue(mockLevels),
       };
-      mockSkuRepo.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+      mockStockLevelRepo.createQueryBuilder.mockReturnValue(mockQueryBuilder);
 
       const result = await service.findLowStock();
 
-      expect(mockSkuRepo.createQueryBuilder).toHaveBeenCalledWith('sku');
+      expect(mockStockLevelRepo.createQueryBuilder).toHaveBeenCalledWith('sl');
       expect(mockQueryBuilder.where).toHaveBeenCalledWith(
-        'sku."currentQuantity" <= sku."reorderThreshold"',
+        'sl."quantity" <= sl."reorderThreshold"',
       );
       expect(mockQueryBuilder.orderBy).toHaveBeenCalledWith(
-        'sku."currentQuantity"',
+        'sl."quantity"',
         'ASC',
       );
       expect(result).toHaveLength(2);
-      expect(result[0].currentQuantity).toBe(3);
-      expect(result[1].currentQuantity).toBe(5);
+      expect(result[0].quantity).toBe(3);
+      expect(result[1].quantity).toBe(5);
     });
 
-    it('should exclude SKUs above the threshold', async () => {
-      mockSkuRepo.createQueryBuilder.mockReturnValue({
+    it('should return empty when all stock levels are above threshold', async () => {
+      mockStockLevelRepo.createQueryBuilder.mockReturnValue({
         where: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
         getMany: jest.fn().mockResolvedValue([]),

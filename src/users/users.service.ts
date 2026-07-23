@@ -56,7 +56,7 @@ export class UsersService {
     const qb = this.userRepository
       .createQueryBuilder('user')
       .where('user.isActive = :isActive', { isActive: true });
-    applySortAndSearch(qb, 'user', query.sortBy, query.sortOrder, query.search, ['username', 'email', 'firstName', 'lastName']);
+    applySortAndSearch(qb, 'user', query.sortBy, query.sortOrder, query.search, ['username', 'email', 'name']);
     const result = await paginate(qb, query.page!, query.limit!);
     return { data: this.userMapper.toResponseList(result.data), total: result.total };
   }
@@ -73,31 +73,31 @@ export class UsersService {
   }
 
   /**
-   * Returns the raw User entity WITH the password field selected.
+   * Returns the raw User entity WITH the passwordHash field selected.
    * For AUTH USE ONLY — never expose this outside of the auth flow.
    */
   async findByEmailForAuth(email: string): Promise<User | null> {
     return this.userRepository
       .createQueryBuilder('user')
-      .addSelect('user.password')
+      .addSelect('user.passwordHash')
       .where('user.email = :email', { email })
       .getOne();
   }
 
   /**
-   * Returns the raw User entity WITH the password field selected.
+   * Returns the raw User entity WITH the passwordHash field selected.
    * For AUTH USE ONLY — never expose this outside of the auth flow.
    */
   async findByUsernameForAuth(username: string): Promise<User | null> {
     return this.userRepository
       .createQueryBuilder('user')
-      .addSelect('user.password')
+      .addSelect('user.passwordHash')
       .where('user.username = :username', { username })
       .getOne();
   }
 
   /**
-   * Update a user's profile fields (email, username, firstName, lastName).
+   * Update a user's profile fields.
    */
   async update(id: string, updateUserDto: UpdateUserDto): Promise<UserResponseDto> {
     const user = await this.userRepository.findOne({ where: { id } });
@@ -121,11 +121,12 @@ export class UsersService {
       user.username = updateUserDto.username.trim();
     }
 
-    if (updateUserDto.firstName !== undefined) {
-      user.firstName = updateUserDto.firstName?.trim() ?? null;
+    if (updateUserDto.name !== undefined) {
+      user.name = updateUserDto.name?.trim() ?? '';
     }
-    if (updateUserDto.lastName !== undefined) {
-      user.lastName = updateUserDto.lastName?.trim() ?? null;
+
+    if (updateUserDto.warehouseId !== undefined) {
+      user.warehouseId = updateUserDto.warehouseId ?? null;
     }
 
     const saved = await this.userRepository.save(user);

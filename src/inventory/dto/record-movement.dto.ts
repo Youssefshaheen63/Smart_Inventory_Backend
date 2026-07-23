@@ -3,12 +3,16 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   Min,
 } from 'class-validator';
 import { MovementReason } from '../stock-movements/enums/movement-reason.enum';
 
 export class RecordMovementDto {
+  @IsUUID()
+  warehouseId!: string;
+
   @IsInt()
   @Min(-1_000_000)
   quantityChange!: number;
