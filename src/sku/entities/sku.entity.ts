@@ -2,32 +2,27 @@ import {
   Column,
   Entity,
   Index,
-  ManyToOne,
-  JoinColumn,
 } from 'typeorm';
-import { AbstractTenantEntity } from '../../shared/tenant.entity';
-import { Category } from '../../categories/entities/category.entity';
-import { Vendor } from '../../vendors/entities/vendor.entity';
+import { AbstractEntity } from '../../shared/base.entity';
 
-/**
- * Sku database entity representing unique product variants.
- */
 @Entity('skus')
-export class Sku extends AbstractTenantEntity {
+export class Sku extends AbstractEntity {
   @Index({ unique: true })
   @Column({ length: 100 })
-  sku!: string;
+  skuCode!: string;
 
   @Column({ length: 255 })
   name!: string;
 
-  @ManyToOne(() => Category, { onDelete: 'SET NULL', nullable: true })
-  @JoinColumn({ name: 'category_id' })
-  category!: Category | null;
+  @Column({ type: 'text', nullable: true })
+  description!: string | null;
 
-  @Index('idx_skus_category')
-  @Column({ name: 'category_id', type: 'uuid', nullable: true })
-  categoryId!: string | null;
+  @Index()
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  category!: string | null;
+
+  @Column({ length: 50, default: 'pcs' })
+  unit!: string;
 
   @Column('numeric', {
     precision: 12,
@@ -49,11 +44,19 @@ export class Sku extends AbstractTenantEntity {
   })
   price!: number;
 
-  @ManyToOne(() => Vendor, { onDelete: 'SET NULL', nullable: true })
-  @JoinColumn({ name: 'preferred_vendor_id' })
-  preferredVendor!: Vendor | null;
+  @Column('int', { default: 0 })
+  reorderThreshold!: number;
 
-  @Index('idx_skus_preferred_vendor')
-  @Column({ name: 'preferred_vendor_id', type: 'uuid', nullable: true })
-  preferredVendorId!: string | null;
+  @Column('int', { default: 0 })
+  safetyStock!: number;
+
+  /**
+   * Denormalized cache of the current stock level.
+   *
+   * This field is updated atomically by StockMovementService.recordMovement()
+   * inside a transaction — do NOT modify it directly anywhere else.
+   * Use reconcileBalance() to verify it against the ledger sum.
+   */
+  @Column('int', { default: 0 })
+  currentQuantity!: number;
 }

@@ -1,9 +1,8 @@
-import { Column, Entity, JoinTable, ManyToMany } from 'typeorm';
-import { AbstractTenantEntity } from '../../shared/tenant.entity';
-import { Sku } from '../../sku/entities/sku.entity';
+import { Column, Entity } from 'typeorm';
+import { AbstractEntity } from '../../shared/base.entity';
 
 @Entity('agent_runs')
-export class AgentRun extends AbstractTenantEntity {
+export class AgentRun extends AbstractEntity {
   @Column({
     type: 'enum',
     enum: ['forecasting', 'reorder', 'negotiation', 'anomaly'],
@@ -17,13 +16,8 @@ export class AgentRun extends AbstractTenantEntity {
   })
   status!: string;
 
-  @ManyToMany(() => Sku)
-  @JoinTable({
-    name: 'agent_run_skus',
-    joinColumn: { name: 'agent_run_id', referencedColumnName: 'id' },
-    inverseJoinColumn: { name: 'sku_id', referencedColumnName: 'id' },
-  })
-  skus!: Sku[];
+  @Column('uuid', { nullable: true })
+  relatedSkuId!: string | null;
 
   @Column('uuid', { nullable: true })
   relatedVendorId!: string | null;

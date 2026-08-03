@@ -1,8 +1,8 @@
 import { Column, Entity } from 'typeorm';
-import { AbstractTenantEntity } from '../../shared/tenant.entity';
+import { AbstractEntity } from '../../shared/base.entity';
 
 @Entity('approval_requests')
-export class ApprovalRequest extends AbstractTenantEntity {
+export class ApprovalRequest extends AbstractEntity {
   @Column('uuid')
   agentRunId!: string;
 

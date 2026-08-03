@@ -35,15 +35,12 @@ describe('StockMovementController', () => {
     expect(controller).toBeDefined();
   });
 
-  const mockUser = { id: 'u1', tenantId: 'tenant-1', warehouseId: 'wh-1' } as any;
-
   describe('getHistoryForSku', () => {
     it('should return paginated response wrapped from service', async () => {
       const mockData = [
         {
           id: 'mov-1',
           skuId: 'sku-1',
-          warehouseId: 'wh-1',
           reason: MovementReason.MANUAL_ADJUSTMENT,
           quantityChange: 5,
           balanceAfter: 15,
@@ -57,10 +54,9 @@ describe('StockMovementController', () => {
       });
 
       const queryDto: StockMovementQueryDto = { reason: MovementReason.MANUAL_ADJUSTMENT, page: 1, limit: 10 };
-      const result = await controller.getHistoryForSku('sku-uuid', queryDto, mockUser);
+      const result = await controller.getHistoryForSku('sku-uuid', queryDto);
 
       expect(mockStockMovementService.getHistoryForSku).toHaveBeenCalledWith(
-        'tenant-1',
         'sku-uuid',
         queryDto,
       );
@@ -76,7 +72,6 @@ describe('StockMovementController', () => {
     it('should return success response wrapped from service', async () => {
       const mockResult = {
         skuId: 'sku-uuid',
-        warehouseId: 'wh-uuid',
         cached: 10,
         calculated: 10,
         matches: true,
@@ -84,9 +79,9 @@ describe('StockMovementController', () => {
 
       mockStockMovementService.reconcileBalance.mockResolvedValue(mockResult);
 
-      const result = await controller.reconcileBalance('sku-uuid', 'wh-uuid' as any, mockUser);
+      const result = await controller.reconcileBalance('sku-uuid');
 
-      expect(mockStockMovementService.reconcileBalance).toHaveBeenCalledWith('tenant-1', 'sku-uuid', 'wh-uuid');
+      expect(mockStockMovementService.reconcileBalance).toHaveBeenCalledWith('sku-uuid');
       expect(result).toEqual({ success: true, data: mockResult, meta: null });
     });
   });
@@ -100,9 +95,12 @@ describe('StockMovementController', () => {
 
       mockStockMovementService.getConsumptionSeries.mockResolvedValue(mockResult);
 
-      const result = await controller.getConsumptionSeries('sku-uuid', 'wh-uuid' as any, 30 as any, mockUser);
+      const result = await controller.getConsumptionSeries('sku-uuid', 30);
 
-      expect(mockStockMovementService.getConsumptionSeries).toHaveBeenCalledWith('tenant-1', 'sku-uuid', 'wh-uuid', 30);
+      expect(mockStockMovementService.getConsumptionSeries).toHaveBeenCalledWith(
+        'sku-uuid',
+        30,
+      );
       expect(result).toEqual({ success: true, data: mockResult, meta: null });
     });
   });

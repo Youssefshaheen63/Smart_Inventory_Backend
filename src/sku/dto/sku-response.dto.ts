@@ -1,17 +1,26 @@
+
 export class SkuResponseDto {
   id!: string;
 
-  sku!: string;
+  skuCode!: string;
 
   name!: string;
 
-  categoryId!: string | null;
+  description!: string | null;
+
+  category!: string | null;
+
+  unit!: string;
 
   cost!: number;
 
   price!: number;
 
-  preferredVendorId!: string | null;
+  currentQuantity!: number;
+
+  reorderThreshold!: number;
+
+  safetyStock!: number;
 
   createdAt!: Date;
 

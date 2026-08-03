@@ -4,6 +4,3 @@ dist/
 coverage/
 *.log
 StockSavvy.postman_collection.json
-docs/
-*.md
-scripts/

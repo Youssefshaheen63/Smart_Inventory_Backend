@@ -9,7 +9,6 @@ export class PurchaseOrderLineItemResponseDto {
 export class PurchaseOrderResponseDto {
   id!: string;
   vendorId!: string;
-  warehouseId!: string;
   status!: string;
   createdBy!: string;
   negotiationRunId!: string | null;

@@ -12,8 +12,6 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { CurrentUser } from '../auth/decorators/current-user/current-user.decorator';
-import { UserResponseDto } from '../users/dto/user-response.dto';
 import {
   ApiBadRequestResponse,
   ApiCreatedResponse,
@@ -39,16 +37,16 @@ export class VendorsController {
   @ApiOperation({ summary: 'Create a vendor' })
   @ApiCreatedResponse({ type: VendorResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid request body' })
-  async create(@Body() dto: CreateVendorDto, @CurrentUser() user: UserResponseDto) {
-    const data = await this.vendorsService.create(user.tenantId!, dto);
+  async create(@Body() dto: CreateVendorDto) {
+    const data = await this.vendorsService.create(dto);
     return successResponse(data);
   }
 
   @Get()
   @ApiOperation({ summary: 'List vendors' })
   @ApiOkResponse({ type: VendorResponseDto, isArray: true })
-  async findAll(@Query() query: VendorQueryDto, @CurrentUser() user: UserResponseDto) {
-    const { data, total } = await this.vendorsService.findAll(user.tenantId!, query);
+  async findAll(@Query() query: VendorQueryDto) {
+    const { data, total } = await this.vendorsService.findAll(query);
     return paginatedResponse(data, query.page!, query.limit!, total);
   }
 
@@ -56,8 +54,8 @@ export class VendorsController {
   @ApiOperation({ summary: 'Get a vendor by ID' })
   @ApiParam({ name: 'id', description: 'Vendor UUID' })
   @ApiOkResponse({ type: VendorResponseDto })
-  async findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: UserResponseDto) {
-    const data = await this.vendorsService.findOne(user.tenantId!, id);
+  async findOne(@Param('id', ParseUUIDPipe) id: string) {
+    const data = await this.vendorsService.findOne(id);
     return successResponse(data);
   }
 
@@ -69,9 +67,8 @@ export class VendorsController {
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateVendorDto,
-    @CurrentUser() user: UserResponseDto,
   ) {
-    const data = await this.vendorsService.update(user.tenantId!, id, dto);
+    const data = await this.vendorsService.update(id, dto);
     return successResponse(data);
   }
 
@@ -80,8 +77,8 @@ export class VendorsController {
   @ApiOperation({ summary: 'Delete a vendor' })
   @ApiParam({ name: 'id', description: 'Vendor UUID' })
   @ApiOkResponse({ description: 'Vendor deleted successfully' })
-  async remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: UserResponseDto) {
-    await this.vendorsService.remove(user.tenantId!, id);
+  async remove(@Param('id', ParseUUIDPipe) id: string) {
+    await this.vendorsService.remove(id);
     return successResponse(null);
   }
 }

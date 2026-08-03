@@ -1,9 +1,8 @@
-import { Column, Entity, ManyToOne, JoinColumn } from 'typeorm';
-import { AbstractTenantEntity } from '../../shared/tenant.entity';
-import { User } from '../../users/entities/user.entity';
+import { Column, Entity } from 'typeorm';
+import { AbstractEntity } from '../../shared/base.entity';
 
 @Entity('anomaly_flags')
-export class AnomalyFlag extends AbstractTenantEntity {
+export class AnomalyFlag extends AbstractEntity {
   @Column('uuid', { nullable: true })
   agentRunId!: string | null;
 
@@ -23,10 +22,6 @@ export class AnomalyFlag extends AbstractTenantEntity {
   })
   status!: string;
 
-  @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
-  @JoinColumn({ name: 'reviewed_by' })
-  reviewer!: User | null;
-
-  @Column('uuid', { nullable: true, name: 'reviewed_by' })
+  @Column('uuid', { nullable: true })
   reviewedBy!: string | null;
 }

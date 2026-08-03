@@ -1,4 +1,4 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Anthropic from '@anthropic-ai/sdk';
 import { ConfigurationError } from './errors/configuration.error';
@@ -9,34 +9,22 @@ const MAX_TOKENS = 4096;
 
 @Injectable()
 export class LLMService {
-  private client: Anthropic | null = null;
-  private readonly logger = new Logger(LLMService.name);
+  private client: Anthropic;
 
   constructor(@Inject(ConfigService) private readonly config: ConfigService) {
     const apiKey = this.config.get<string>('ANTHROPIC_API_KEY');
     if (!apiKey) {
-      this.logger.warn(
-        'ANTHROPIC_API_KEY is not set. LLM features will be unavailable until a key is provided.',
+      throw new ConfigurationError(
+        'ANTHROPIC_API_KEY is not set in environment variables. The LLM service cannot start without it.',
       );
-      return;
     }
     this.client = new Anthropic({ apiKey });
   }
 
-  private ensureClient(): Anthropic {
-    if (!this.client) {
-      throw new ConfigurationError(
-        'ANTHROPIC_API_KEY is not set in environment variables. LLM features are unavailable.',
-      );
-    }
-    return this.client;
-  }
-
   async runWithTools(
-    tenantId: string,
     systemPrompt: string,
     userMessage: string,
-    tools: Anthropic.Messages.Tool[],
+    tools: Anthropic.ToolParam[],
     toolExecutor: ToolExecutorService,
     maxToolRounds: number = 5,
   ): Promise<string> {
@@ -45,8 +33,7 @@ export class LLMService {
     ];
 
     for (let round = 0; round < maxToolRounds; round++) {
-      const client = this.ensureClient();
-      const response = await client.messages.create({
+      const response = await this.client.messages.create({
         model: MODEL,
         system: systemPrompt,
         messages,
@@ -71,7 +58,6 @@ export class LLMService {
         let result: unknown;
         try {
           result = await toolExecutor.execute(
-            tenantId,
             toolUse.name,
             toolUse.input as Record<string, unknown>,
           );
@@ -102,8 +88,7 @@ export class LLMService {
   ): Promise<T> {
     const fullSystemPrompt = `${systemPrompt}\n\nRespond ONLY with a valid JSON object matching this schema, no other text, no markdown code fences:\n${schema}`;
 
-    const client = this.ensureClient();
-    const response = await client.messages.create({
+    const response = await this.client.messages.create({
       model: MODEL,
       system: fullSystemPrompt,
       messages: [{ role: 'user', content: context }],

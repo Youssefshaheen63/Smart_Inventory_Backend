@@ -9,7 +9,6 @@ export class PurchaseOrderMapper {
   toEntity(createDto: CreatePurchaseOrderDto): PurchaseOrder {
     const po = new PurchaseOrder();
     po.vendorId = createDto.vendorId;
-    po.warehouseId = createDto.warehouseId;
     po.createdBy = createDto.createdBy ?? 'manual';
     po.lineItems = createDto.lineItems.map((item) => this.toLineItemEntity(item));
     return po;
@@ -27,7 +26,6 @@ export class PurchaseOrderMapper {
     const dto = new PurchaseOrderResponseDto();
     dto.id = po.id;
     dto.vendorId = po.vendorId;
-    dto.warehouseId = po.warehouseId;
     dto.status = po.status;
     dto.createdBy = po.createdBy;
     dto.negotiationRunId = po.negotiationRunId;
